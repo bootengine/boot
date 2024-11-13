@@ -1,0 +1,18 @@
+{"root": [
+    "internal",
+    "pkg",
+    {
+      "cmd": [
+        "install",
+        {
+          "root.yaml": {
+            "template": {
+              "filepath": "./test",
+              "engine": "jinja2"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
