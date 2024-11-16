@@ -75,6 +75,10 @@ func (m ModuleUsecase) InstallModuleFromURL(ctx context.Context, modName string,
 	return m.InstallModuleFromFS(ctx, modName, modType, pluginPath)
 }
 
+func (m ModuleUsecase) UpdateModule(ctx context.Context, modName, modPath string) error {
+	return m.Datastore.UpdateModulePath(ctx, modName, modPath)
+}
+
 func (m ModuleUsecase) RemoveModule(ctx context.Context, modName string) error {
 	// delete in fs
 	mod, err := m.Datastore.GetModule(ctx, modName)
