@@ -40,7 +40,16 @@ func (m ModuleUsecase) ListModules(ctx context.Context) ([]model.Module, error) 
 	return m.Datastore.ListModules(ctx)
 }
 
-func (m ModuleUsecase) InstallModule(ctx context.Context, modName string, modType model.PluginType, modUrl string) error {
+func (m ModuleUsecase) InstallModuleFromFS(ctx context.Context, modName string, modType model.ModuleType, modPath string) error {
+	mod := model.Module{
+		Name: modName,
+		Path: modPath,
+		Type: modType,
+	}
+	return m.Datastore.AddModule(ctx, mod)
+}
+
+func (m ModuleUsecase) InstallModuleFromURL(ctx context.Context, modName string, modType model.ModuleType, modUrl string) error {
 	// install in filesystem
 	res, err := http.Get(modUrl)
 	if err != nil {
@@ -63,14 +72,7 @@ func (m ModuleUsecase) InstallModule(ctx context.Context, modName string, modTyp
 		return err
 	}
 
-	mod := model.Module{
-		Name: modName,
-		Path: pluginPath,
-		Type: modType,
-	}
-
-	// install in Db
-	return m.Datastore.AddModule(ctx, mod)
+	return m.InstallModuleFromFS(ctx, modName, modType, pluginPath)
 }
 
 func (m ModuleUsecase) RemoveModule(ctx context.Context, modName string) error {

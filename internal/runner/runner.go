@@ -168,7 +168,7 @@ func (r Runner) handleSteps() error {
 				return errors.New(errString)
 			}
 		// log success
-		case model.ModuleType:
+		case model.CmdType:
 			cwd, err := func() (string, error) {
 				if step.CurrentWorkingDir != "" {
 					return step.CurrentWorkingDir, nil

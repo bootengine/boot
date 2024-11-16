@@ -1,36 +1,58 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
+	"regexp"
 
+	"github.com/bootengine/boot/internal/helper"
+	"github.com/bootengine/boot/internal/model"
+	"github.com/bootengine/boot/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
+type installCmdFlags struct {
+	name       string
+	pathOrURL  string
+	moduleType string
+}
+
+var installFlags installCmdFlags
+
 // installCmd represents the install command
 var installCmd = &cobra.Command{
-	Use:   "install",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:     "install",
+	Aliases: []string{"i"},
+	Short:   "install a module",
+	Long: `install a module, given a path (or url) and a type (cmd, filer, vcs, template_engine).
+	----
+	cmd: module that will return a command to be executed.
+	filer: module that will create files/folder or bootstrap the folder_struct definition.
+	vcs: module that will run vcs based command like commit and push code.
+	template_engine: module that will handle templating in the folder_struct definition.
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("install called")
+		helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) {
+			var moduleType model.ModuleType
+			moduleType.FromString(installFlags.moduleType)
+			reg := regexp.MustCompile("^(http|https)://.*$")
+			if reg.Match([]byte(installFlags.pathOrURL)) {
+				err := use.InstallModuleFromURL(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
+				if err != nil {
+				}
+				return
+			}
+			err := use.InstallModuleFromFS(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
+			if err != nil {
+			}
+		})
 	},
 }
 
 func init() {
-	pluginCmd.AddCommand(installCmd)
+	moduleCmd.AddCommand(installCmd)
 
-	// Here you will define your flags and configuration settings.
+	installCmd.Flags().StringVarP(&installFlags.name, "name", "n", "", "module's name - don't forget that the name is UNIQUE.")
+	installCmd.Flags().StringVarP(&installFlags.pathOrURL, "location", "l", "", "module's location - it can be either a path or a URL to a .wasm file.")
+	installCmd.Flags().StringVarP(&installFlags.moduleType, "type", "t", "", "module's type - one of [filer,cmd,vcs,template_engine].")
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// installCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// installCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

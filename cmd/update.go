@@ -22,7 +22,7 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	pluginCmd.AddCommand(updateCmd)
+	moduleCmd.AddCommand(updateCmd)
 
 	// Here you will define your flags and configuration settings.
 

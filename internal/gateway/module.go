@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/bootengine/boot/internal/model"
 	"github.com/doug-martin/goqu/v9"
@@ -19,21 +17,6 @@ type ModuleGateway struct {
 }
 
 const tablename = "module"
-
-// TODO: it's not its place !
-func meh() error {
-	home, err := os.UserConfigDir()
-	if err != nil {
-		return err
-	}
-	dataDir := filepath.Join(home, "boot", "data")
-	err = os.MkdirAll(dataDir, 0755)
-	if err != nil {
-		return err
-	}
-	filepath.Join(dataDir, "db")
-	return nil
-}
 
 func (m *ModuleGateway) OpenDatabase(databaseUrl string) error {
 	d, err := sql.Open("sqlite", databaseUrl)
