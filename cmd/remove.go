@@ -1,36 +1,36 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
 
+	"github.com/bootengine/boot/internal/helper"
+	"github.com/bootengine/boot/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
+type removeCmdFlags struct {
+	name string
+}
+
+var removeFlags removeCmdFlags
+
 // removeCmd represents the remove command
 var removeCmd = &cobra.Command{
-	Use:   "remove",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:     "remove",
+	Aliases: []string{"rm", "r"},
+	Short:   "remove a module from it's name.",
+	Long:    `remove a module from it's name.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("remove called")
+		helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) {
+			err := use.RemoveModule(ctx, removeFlags.name)
+			if err != nil {
+			}
+		})
 	},
 }
 
 func init() {
 	moduleCmd.AddCommand(removeCmd)
+	removeCmd.Flags().StringVarP(&removeFlags.name, "name", "n", "", "name of the module you want to remove.")
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// removeCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// removeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
