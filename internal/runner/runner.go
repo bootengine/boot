@@ -24,10 +24,11 @@ type Runner struct {
 
 type ValueKey struct{}
 
-func NewRunner(use *usecase.ModuleUsecase) *Runner {
+func NewRunner(use *usecase.ModuleUsecase, workflow model.Workflow) *Runner {
 	return &Runner{
-		ctx:     context.Background(),
-		modCase: use,
+		ctx:      context.Background(),
+		modCase:  use,
+		workflow: workflow,
 	}
 }
 

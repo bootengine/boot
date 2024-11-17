@@ -1,36 +1,53 @@
 package cmd
 
 import (
-	"fmt"
+	"context"
+	"regexp"
 
+	"github.com/bootengine/boot/internal/helper"
+	"github.com/bootengine/boot/internal/parser"
+	"github.com/bootengine/boot/internal/runner"
+	"github.com/bootengine/boot/internal/usecase"
 	"github.com/spf13/cobra"
 )
+
+type genCmdFlags struct {
+	pathOrURL string
+}
+
+var genFlags genCmdFlags
 
 // genCmd represents the gen command
 var genCmd = &cobra.Command{
 	Use:   "gen",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "generate a new project from a config file.",
+	Long:  `generate a new project from a config file. This file can be either on your local computer or it can be a repository.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("gen called")
+		helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) {
+			reg := regexp.MustCompile("^(http|https)://.*$")
+			if reg.Match([]byte(genFlags.pathOrURL)) {
+				// dl repo in tmp folder
+				// compute path to tmp/repo/whatever.[yaml|json|toml|...]
+
+			}
+			work, err := parser.NewParser().Parse(genFlags.pathOrURL)
+			if err != nil {
+			}
+
+			worker := runner.NewRunner(use, *work)
+			err = worker.Run()
+			if err != nil {
+			}
+		})
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(genCmd)
 
-	// Here you will define your flags and configuration settings.
+	genCmd.Flags().StringVarP(&genFlags.pathOrURL, "file", "f", "", `config file for the generation process, can be either a repo url or a local path.
+If it's a repo url, the repo will be downloaded in a tmp dir and removed afterward.
+		`)
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// genCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// genCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	genCmd.MarkFlagRequired("file")
 }
