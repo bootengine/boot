@@ -32,5 +32,6 @@ var removeCmd = &cobra.Command{
 func init() {
 	moduleCmd.AddCommand(removeCmd)
 	removeCmd.Flags().StringVarP(&removeFlags.name, "name", "n", "", "name of the module you want to remove.")
+	installCmd.MarkFlagRequired("name")
 
 }

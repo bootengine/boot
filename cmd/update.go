@@ -34,4 +34,6 @@ func init() {
 
 	updateCmd.Flags().StringVarP(&updateFlags.name, "name", "n", "", "the name of the module you want to modify.")
 	updateCmd.Flags().StringVarP(&updateFlags.path, "path", "p", "", "the local path to the new module file (.wasm).")
+	installCmd.MarkFlagRequired("name")
+	installCmd.MarkFlagRequired("path")
 }

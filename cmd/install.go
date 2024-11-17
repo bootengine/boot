@@ -55,4 +55,7 @@ func init() {
 	installCmd.Flags().StringVarP(&installFlags.pathOrURL, "location", "l", "", "module's location - it can be either a path or a URL to a .wasm file.")
 	installCmd.Flags().StringVarP(&installFlags.moduleType, "type", "t", "", "module's type - one of [filer,cmd,vcs,template_engine].")
 
+	installCmd.MarkFlagRequired("name")
+	installCmd.MarkFlagRequired("location")
+	installCmd.MarkFlagRequired("type")
 }
