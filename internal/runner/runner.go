@@ -24,6 +24,14 @@ type Runner struct {
 
 type ValueKey struct{}
 
+var keepGoing bool = true
+
+type NoKeepGoingError bool
+
+func (n NoKeepGoingError) Error() string {
+	return "no keep going"
+}
+
 func NewRunner(use *usecase.ModuleUsecase, workflow model.Workflow) *Runner {
 	return &Runner{
 		ctx:      context.Background(),
@@ -48,9 +56,13 @@ func (r Runner) checkFolderStructCreation() error {
 			Title("/!\\ Are you sure ?").
 			Affirmative("Yes !").
 			Negative("Oups ... No!").
+			Value(&keepGoing).
 			Run()
 		if err != nil {
 			return HuhError{Err: err}
+		}
+		if !keepGoing {
+			return NoKeepGoingError(keepGoing)
 		}
 	}
 	return nil
@@ -73,14 +85,17 @@ func (r Runner) Run() error {
 func (r *Runner) handleVars() error {
 	values := make(map[string]any)
 	if _, ok := r.workflow.Vars["project_name"]; !ok && r.workflow.Config.CreateRoot {
-		// TODO: handle cancellation
 		err := huh.NewConfirm().Description("the project needs a name, convention is forcing on a 'project_name' var").
 			Title("/!\\ Caution !").
 			Affirmative("Ok").
 			Negative("Cancel").
+			Value(&keepGoing).
 			Run()
 		if err != nil {
 			return HuhError{Err: err}
+		}
+		if !keepGoing {
+			return NoKeepGoingError(keepGoing)
 		}
 	}
 
@@ -127,11 +142,11 @@ func (r Runner) handleSteps() error {
 			return err
 		}
 
-		// check type and action
-		fmt.Println(step)
+		if !slices.Contains(model.Capabilities[mod.Type], step.Action) {
+			return fmt.Errorf("this type of plugin (%s) can't run this action (%s)", mod.Type, step.Action)
+		}
 
 		manifest := extism.Manifest{
-
 			Wasm: []extism.Wasm{
 				extism.WasmFile{
 					Name: mod.Name,
@@ -140,11 +155,20 @@ func (r Runner) handleSteps() error {
 			},
 		}
 
-		config := extism.PluginConfig{
-			EnableWasi: true,
+		hostFunctions := []extism.HostFunction{}
+		config := extism.PluginConfig{}
+		if mod.Type == model.FilerType {
+			callTemplate := extism.NewHostFunctionWithStack(
+				"callTemplate",
+				r.callTemplateFunc, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR}, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR})
+
+			hostFunctions = append(hostFunctions, callTemplate)
+			if mod.Type == model.FilerType || mod.Type == model.VCSType {
+				config.EnableWasi = true
+			}
 		}
 
-		plugin, err := extism.NewPlugin(r.ctx, manifest, config, []extism.HostFunction{})
+		plugin, err := extism.NewPlugin(r.ctx, manifest, config, hostFunctions)
 		if err != nil {
 			return err
 		}
@@ -210,4 +234,66 @@ func (r Runner) checkCommandContent(cmd string) bool {
 		return false
 	}
 	return true
+}
+
+func (r Runner) callTemplateFunc(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
+	handleErr := func(msg []byte) {
+		var err error
+		stack[1], err = p.WriteBytes(msg)
+		if err != nil {
+			panic(fmt.Errorf("an error as occured while parsing template and the caller failed to handle it: %w", err))
+		}
+	}
+
+	tempPath, err := p.ReadString(stack[1])
+	if err != nil {
+		handleErr([]byte(err.Error()))
+	}
+	tempEngine, err := p.ReadString(stack[0])
+	if err != nil {
+		handleErr([]byte(err.Error()))
+	}
+
+	mod, err := r.modCase.RetrieveModule(ctx, tempEngine)
+	if err != nil {
+		handleErr([]byte(err.Error()))
+	}
+
+	if mod.Type != model.TempEngineType {
+		err = fmt.Errorf("")
+		handleErr([]byte(err.Error()))
+	}
+	manifest := extism.Manifest{
+		Wasm: []extism.Wasm{
+			extism.WasmFile{
+				Name: mod.Name,
+				Path: mod.Path,
+			},
+		},
+	}
+	config := extism.PluginConfig{}
+	plugin, err := extism.NewPlugin(r.ctx, manifest, config, []extism.HostFunction{})
+	if err != nil {
+		handleErr([]byte(err.Error()))
+	}
+
+	fileContent, err := os.ReadFile(tempPath)
+	if err != nil {
+		handleErr([]byte(err.Error()))
+	}
+
+	ex, out, err := plugin.CallWithContext(ctx, string(model.FormatTemplAction), fileContent)
+	if err != nil {
+		handleErr([]byte(err.Error()))
+	}
+
+	if ex == 0 {
+		stack[0], err = p.WriteBytes(out)
+		if err != nil {
+			panic(fmt.Sprintf("the filer plugin failed to retrieve data from the template engine %s: %s", mod.Name, err.Error()))
+		}
+	} else {
+		errString := plugin.GetErrorWithContext(r.ctx)
+		handleErr([]byte(fmt.Sprintf("template plugin exited with error status: %s", errString)))
+	}
 }

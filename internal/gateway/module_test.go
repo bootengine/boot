@@ -3,7 +3,6 @@ package gateway_test
 import (
 	"context"
 	_ "embed"
-	"fmt"
 	"testing"
 
 	"github.com/bootengine/boot/internal/gateway"
@@ -82,7 +81,6 @@ func Test_AddModule(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				err := gt.AddModule(ctx, tt.input)
-				fmt.Println(err)
 				if tt.expectedErr != "" {
 					td.CmpContains(t, err, tt.expectedErr)
 				} else {
@@ -90,7 +88,6 @@ func Test_AddModule(t *testing.T) {
 					res, err := gt.ListModules(ctx)
 					td.CmpNoError(t, err)
 
-					fmt.Println(res)
 					td.Cmp(t, len(res), 1)
 				}
 			})

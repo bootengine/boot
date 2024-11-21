@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/bootengine/boot/internal/model"
@@ -86,7 +85,6 @@ func TestParser_Parse(t *testing.T) {
 	got, err := p.Parse("../mocks/workflow.yaml")
 	td.CmpNoError(t, err)
 	if err == nil {
-		fmt.Println(got.FolderStruct)
 		td.Cmp(t, got, &expected)
 	}
 

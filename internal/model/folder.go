@@ -96,7 +96,6 @@ func (f *Folder) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	s := string(data)[1 : len(data)-1]
-	fmt.Println(s)
 	if path.Ext(s) == "" {
 		f.Name = s
 		f.Filers = nil

@@ -18,8 +18,8 @@ var removeFlags removeCmdFlags
 var removeCmd = &cobra.Command{
 	Use:     "remove",
 	Aliases: []string{"rm", "r"},
-	Short:   "remove a module from it's name.",
-	Long:    `remove a module from it's name.`,
+	Short:   "Remove a module from it's name.",
+	Long:    `Remove a module from it's name.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) {
 			err := use.RemoveModule(ctx, removeFlags.name)

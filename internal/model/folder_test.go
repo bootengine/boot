@@ -105,7 +105,6 @@ func Test_FolderUnmarshal(t *testing.T) {
 		t.Run(tt.testname, func(t *testing.T) {
 			var got model.Folder
 
-			fmt.Printf("%T\n", got)
 			err := json.Unmarshal([]byte(tt.input), &got)
 			td.CmpNoError(t, err)
 

@@ -22,8 +22,8 @@ var installFlags installCmdFlags
 var installCmd = &cobra.Command{
 	Use:     "install",
 	Aliases: []string{"i"},
-	Short:   "install a module",
-	Long: `install a module, given a path (or url) and a type (cmd, filer, vcs, template_engine).
+	Short:   "Install a module",
+	Long: `Install a module, given a path (or url) and a type (cmd, filer, vcs, template_engine).
 	----
 	cmd: module that will return a command to be executed.
 	filer: module that will create files/folder or bootstrap the folder_struct definition.
