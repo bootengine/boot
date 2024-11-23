@@ -20,8 +20,8 @@ type TemplateDef struct {
 }
 
 type File struct {
-	Name string
-	*TempWrapper
+	Name         string
+	*TempWrapper `json:",omitempty"`
 }
 
 type TempWrapper struct {

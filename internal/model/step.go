@@ -4,6 +4,6 @@ type Step struct {
 	Name              string
 	Module            string
 	Action            ModuleAction
-	CurrentWorkingDir string `json:"cwd"`
-	Params            []string
+	CurrentWorkingDir string   `json:"cwd,omitempty"`
+	Params            []string `json:"params,omitempty"`
 }

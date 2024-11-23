@@ -1,36 +1,100 @@
 package cmd
 
 import (
-	"fmt"
+	"encoding/json"
+	"os"
 
+	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/encoding/yaml"
+	"github.com/bootengine/boot/internal/model"
 	"github.com/spf13/cobra"
 )
+
+type outputFileType string
+
+const (
+	JSON outputFileType = "json"
+	YAML outputFileType = "yaml"
+)
+
+type initCmdFlags struct {
+	outputFilename string
+	outputType     outputFileType
+}
+
+var initFlags initCmdFlags
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Init help you generate a default boot workflow file.",
+	Long:  `Init will help you generate a default boot workflow file into the output filename given an output type [json, yaml]`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("init called")
+		workflow := newDefaultWorkflow()
+		var (
+			marshaled []byte
+			err       error
+		)
+		switch initFlags.outputType {
+		case JSON:
+			marshaled, err = json.Marshal(workflow)
+		case YAML:
+			ctx := cuecontext.New()
+			val := ctx.Encode(workflow)
+			marshaled, err = yaml.Encode(val)
+		}
+
+		if err != nil {
+		}
+
+		err = os.WriteFile(initFlags.outputFilename, marshaled, 0664)
+		if err != nil {
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
 
-	// Here you will define your flags and configuration settings.
+	initCmd.Flags().StringVarP(&initFlags.outputFilename, "output", "o", "", "filename of the output.")
+	initCmd.Flags().StringVarP((*string)(&initFlags.outputType), "type", "t", "yaml", "type of the output file.")
+	initCmd.MarkFlagRequired("output")
+}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func newDefaultWorkflow() model.Workflow {
+	return model.Workflow{
+		Config: model.Config{
+			CreateRoot: true,
+		},
+		Vars: model.Vars{
+			"project_name": model.Var{
+				Required: true,
+				Type:     model.String,
+			},
+			"license": model.Var{
+				Required: true,
+				Type:     model.License,
+			},
+		},
+		Steps: []model.Step{
+			{
+				Name:   "git init",
+				Module: "git",
+				Action: model.InitAction,
+			},
+			{
+				Name:   "create folder structure",
+				Module: "filer",
+				Action: model.CreateFolderStructAction,
+			},
+		},
+		FolderStruct: model.FolderStruct{
+			model.File{
+				Name: ".gitignore",
+			},
+			model.File{
+				Name: "README.md",
+			},
+		},
+	}
 }
