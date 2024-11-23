@@ -2,13 +2,11 @@ package parser
 
 import (
 	_ "embed"
-	"log"
 	"regexp"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/ast"
 	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/encoding/yaml"
+	"github.com/bootengine/boot/internal/helper"
 	"github.com/bootengine/boot/internal/model"
 )
 
@@ -21,31 +19,32 @@ func NewParser() *Parser {
 	return &Parser{}
 }
 
+func (p Parser) Check(ctx *cue.Context, value cue.Value) error {
+	schema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("#Workflow"))
+	unified := schema.Unify(value)
+	return unified.Validate()
+}
+
 func (p Parser) Parse(filename string) (*model.Workflow, error) {
 	var (
 		workflow model.Workflow
 		err      error
-		yamlFile *ast.File
 		ctx      = cuecontext.New()
-		schema   = ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("#Workflow"))
 	)
 
 	if filenameIsURL(filename) {
 		// clone in temp dir or query the file
-	} else {
-		yamlFile, err = yaml.Extract(filename, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
 	}
 
-	yamlAsCUE := ctx.BuildFile(yamlFile)
-	unified := schema.Unify(yamlAsCUE)
-	if err := unified.Validate(); err != nil {
+	cueValue, err := helper.CueUnmarshalFile(ctx, filename)
+	if err != nil {
+	}
+
+	if err = p.Check(ctx, *cueValue); err != nil {
 		return nil, err
 	}
 
-	if err = yamlAsCUE.Decode(&workflow); err != nil {
+	if err = cueValue.Decode(&workflow); err != nil {
 		return nil, err
 	}
 

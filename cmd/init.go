@@ -6,20 +6,14 @@ import (
 
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/encoding/yaml"
+	"github.com/bootengine/boot/internal/helper"
 	"github.com/bootengine/boot/internal/model"
 	"github.com/spf13/cobra"
 )
 
-type outputFileType string
-
-const (
-	JSON outputFileType = "json"
-	YAML outputFileType = "yaml"
-)
-
 type initCmdFlags struct {
 	outputFilename string
-	outputType     outputFileType
+	outputType     helper.SupportedFileType
 }
 
 var initFlags initCmdFlags
@@ -36,9 +30,9 @@ var initCmd = &cobra.Command{
 			err       error
 		)
 		switch initFlags.outputType {
-		case JSON:
+		case helper.JSON:
 			marshaled, err = json.Marshal(workflow)
-		case YAML:
+		case helper.YAML:
 			ctx := cuecontext.New()
 			val := ctx.Encode(workflow)
 			marshaled, err = yaml.Encode(val)
