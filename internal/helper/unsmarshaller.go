@@ -42,6 +42,9 @@ func CueUnmarshalFile(ctx *cue.Context, filename string) (*cue.Value, error) {
 	default:
 		return nil, fmt.Errorf("unsupported file type")
 	}
+	if exp == nil {
+		return nil, fmt.Errorf("empty workflow file")
+	}
 	val := ctx.BuildExpr(exp)
 	return &val, nil
 }

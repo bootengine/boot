@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/bootengine/boot/internal/helper"
 	"github.com/bootengine/boot/internal/parser"
@@ -17,22 +15,24 @@ var checkFlags checkCmdsFlags
 
 // checkCmd represents the check command
 var checkCmd = &cobra.Command{
-	Use:   "check",
-	Short: "Check that the given file is valid.",
-	Long:  `Check that the given file is a valid boot workflow. It will not check that selected module are installed, it will just check that it`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:           "check",
+	Short:         "Check that the given file is valid.",
+	Long:          `Check that the given file is a valid boot workflow. It will not check that selected module are installed, it will just check that it`,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cuecontext.New()
 		p := parser.NewParser()
 		cueValue, err := helper.CueUnmarshalFile(ctx, checkFlags.filename)
 		if err != nil {
-			fmt.Println(err)
-			panic(err)
+			return err
 		}
 
 		if err = p.Check(ctx, *cueValue); err != nil {
+			return err
 		}
-		fmt.Println("check successful")
 
+		// TODO: log success
+		return nil
 	},
 }
 

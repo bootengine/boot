@@ -2,6 +2,7 @@ package parser
 
 import (
 	_ "embed"
+	"fmt"
 	"regexp"
 
 	"cuelang.org/go/cue"
@@ -17,6 +18,15 @@ type Parser struct{}
 
 func NewParser() *Parser {
 	return &Parser{}
+}
+
+type ParserError struct {
+	action, filename string
+	err              error
+}
+
+func (p ParserError) Error() string {
+	return fmt.Sprintf("failed to %s file (%s): %s", p.action, p.filename, p.err)
 }
 
 func (p Parser) Check(ctx *cue.Context, value cue.Value) error {
@@ -38,17 +48,29 @@ func (p Parser) Parse(filename string) (*model.Workflow, error) {
 
 	cueValue, err := helper.CueUnmarshalFile(ctx, filename)
 	if err != nil {
+		return nil, ParserError{
+			action:   "read",
+			err:      err,
+			filename: filename,
+		}
 	}
 
 	if err = p.Check(ctx, *cueValue); err != nil {
-		return nil, err
+		return nil, ParserError{
+			action:   "check",
+			err:      err,
+			filename: filename,
+		}
+
 	}
 
 	if err = cueValue.Decode(&workflow); err != nil {
-		return nil, err
+		return nil, ParserError{
+			action:   "convert",
+			err:      err,
+			filename: filename,
+		}
 	}
-
-	// validate workflow
 
 	return &workflow, nil
 }

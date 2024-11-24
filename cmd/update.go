@@ -17,14 +17,13 @@ var updateFlags updateCmdFlags
 
 // updateCmd represents the update command
 var updateCmd = &cobra.Command{
-	Use:   "update",
-	Short: "update the path to a given module.",
-	Long:  `update the path to a given module, assuming you're targeting a locally installed .wasm file.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) {
-			err := use.UpdateModule(ctx, updateFlags.name, updateFlags.path)
-			if err != nil {
-			}
+	Use:           "update",
+	Short:         "update the path to a given module.",
+	Long:          `update the path to a given module, assuming you're targeting a locally installed .wasm file.`,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) error {
+			return use.UpdateModule(ctx, updateFlags.name, updateFlags.path)
 		})
 	},
 }

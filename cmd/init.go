@@ -20,10 +20,11 @@ var initFlags initCmdFlags
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Init help you generate a default boot workflow file.",
-	Long:  `Init will help you generate a default boot workflow file into the output filename given an output type [json, yaml]`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:           "init",
+	Short:         "Init help you generate a default boot workflow file.",
+	Long:          `Init will help you generate a default boot workflow file into the output filename given an output type [json, yaml]`,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		workflow := newDefaultWorkflow()
 		var (
 			marshaled []byte
@@ -39,11 +40,10 @@ var initCmd = &cobra.Command{
 		}
 
 		if err != nil {
+			return err
 		}
 
-		err = os.WriteFile(initFlags.outputFilename, marshaled, 0664)
-		if err != nil {
-		}
+		return os.WriteFile(initFlags.outputFilename, marshaled, 0664)
 	},
 }
 

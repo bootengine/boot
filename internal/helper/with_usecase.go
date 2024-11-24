@@ -10,7 +10,9 @@ import (
 	"github.com/bootengine/boot/internal/usecase"
 )
 
-func WithModuleUsecase(exec func(ctx context.Context, use *usecase.ModuleUsecase)) {
+type useCaseFunc func(ctx context.Context, use *usecase.ModuleUsecase) error
+
+func WithModuleUsecase(exec useCaseFunc) error {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -19,20 +21,27 @@ func WithModuleUsecase(exec func(ctx context.Context, use *usecase.ModuleUsecase
 
 	datastore, err := gateway.NewModuleGateway()
 	if err != nil {
+		cancel()
+		return err
 	}
 
 	dbUrl, err := getDbURL()
 	if err != nil {
+		cancel()
+		return err
 	}
 
 	err = datastore.OpenDatabase(*dbUrl)
 	if err != nil {
+		cancel()
+		return err
 	}
 
 	defer func() {
 		err = datastore.CloseDatabase()
 		signal.Stop(c)
 		if err != nil {
+			// TODO: panic ?
 		}
 	}()
 
@@ -43,8 +52,7 @@ func WithModuleUsecase(exec func(ctx context.Context, use *usecase.ModuleUsecase
 
 	u := usecase.NewModuleUsecase(datastore)
 
-	exec(ctx, u)
-
+	return exec(ctx, u)
 }
 
 func getDbURL() (*string, error) {

@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"errors"
-	"os"
 	"regexp"
 	"sync"
 
@@ -22,19 +21,21 @@ var genFlags genCmdFlags
 
 // genCmd represents the gen command
 var genCmd = &cobra.Command{
-	Use:   "gen",
-	Short: "Generate a new project from a config file.",
-	Long:  `Generate a new project from a config file. This file can be either on your local computer or it can be a repository.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:           "gen",
+	Short:         "Generate a new project from a config file.",
+	Long:          `Generate a new project from a config file. This file can be either on your local computer or it can be a repository.`,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		var once sync.Once
 		onceFunc := func() {
 			defer func() {
 				err := cleanup()
 				if err != nil {
+					// panic ?
 				}
 			}()
 		}
-		helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) {
+		return helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) error {
 			reg := regexp.MustCompile("^(http|https)://.*$")
 			if reg.Match([]byte(genFlags.pathOrURL)) {
 				// dl repo in tmp folder
@@ -44,6 +45,7 @@ var genCmd = &cobra.Command{
 			}
 			work, err := parser.NewParser().Parse(genFlags.pathOrURL)
 			if err != nil {
+				return err
 			}
 
 			worker := runner.NewRunner(use, *work)
@@ -51,10 +53,10 @@ var genCmd = &cobra.Command{
 			if err != nil {
 				if errors.Is(err, runner.NoKeepGoingError(false)) {
 					once.Do(onceFunc)
-					os.Exit(1)
 				}
-
+				return err
 			}
+			return nil
 		})
 	},
 }

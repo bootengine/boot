@@ -22,6 +22,36 @@ type Runner struct {
 	modCase  *usecase.ModuleUsecase
 }
 
+type StepError struct {
+	err                error
+	moduleName, action string
+}
+
+func (s StepError) Error() string {
+	return fmt.Sprintf("failed to execute runner for module %s, action %s: %s", s.moduleName, s.action, s.err.Error())
+}
+
+func (s StepError) GetType() string {
+	return "steps"
+}
+
+type VarError struct {
+	err  error
+	vars string
+}
+
+func (v VarError) Error() string {
+	return fmt.Sprintf("failed to handle var %s: %s", v.vars, v.err)
+}
+func (v VarError) GetType() string {
+	return "vars"
+}
+
+type RunnerError interface {
+	GetType() string
+	Error() string
+}
+
 type ValueKey struct{}
 
 var keepGoing bool = true
@@ -126,7 +156,10 @@ func (r *Runner) handleVars() error {
 			}
 			values[k] = val
 		default:
-			return fmt.Errorf("%s type of var is not managed by boot", v.Type)
+			return VarError{
+				err:  fmt.Errorf("%s type of var is not managed by boot", v.Type),
+				vars: k,
+			}
 		}
 	}
 	r.ctx = context.WithValue(r.ctx, ValueKey{}, values)
@@ -137,13 +170,21 @@ func (r *Runner) handleVars() error {
 func (r Runner) handleSteps() error {
 	for _, step := range r.workflow.Steps {
 		// find module
-		mod, err := r.modCase.RetrieveModule(r.ctx, step.Name)
+		mod, err := r.modCase.RetrieveModule(r.ctx, step.Module)
 		if err != nil {
-			return err
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        err,
+			}
 		}
 
 		if !slices.Contains(model.Capabilities[mod.Type], step.Action) {
-			return fmt.Errorf("this type of plugin (%s) can't run this action (%s)", mod.Type, step.Action)
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        fmt.Errorf("this type of plugin (%s) can't run this action (%s)", mod.Type, step.Action),
+			}
 		}
 
 		manifest := extism.Manifest{
@@ -170,13 +211,21 @@ func (r Runner) handleSteps() error {
 
 		plugin, err := extism.NewPlugin(r.ctx, manifest, config, hostFunctions)
 		if err != nil {
-			return err
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        err,
+			}
 		}
 		var params []byte
 		if step.Params != nil {
 			params, err = json.Marshal(step.Params)
 			if err != nil {
-				return err
+				return StepError{
+					moduleName: step.Module,
+					action:     string(step.Action),
+					err:        err,
+				}
 			}
 		}
 
@@ -184,13 +233,21 @@ func (r Runner) handleSteps() error {
 
 		exit, out, err := plugin.CallWithContext(r.ctx, string(step.Action), params)
 		if err != nil {
-			return err
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        err,
+			}
 		}
 		switch mod.Type {
 		case model.FilerType, model.VCSType:
 			if exit != 0 {
 				errString := plugin.GetErrorWithContext(r.ctx)
-				return errors.New(errString)
+				return StepError{
+					moduleName: step.Module,
+					action:     string(step.Action),
+					err:        errors.New(errString),
+				}
 			}
 		// log success
 		case model.CmdType:
@@ -204,14 +261,21 @@ func (r Runner) handleSteps() error {
 				return os.Getwd()
 			}()
 			if err != nil {
-				return err
+				return StepError{
+					moduleName: step.Module,
+					action:     string(step.Action),
+					err:        err,
+				}
 			}
 			err = r.executeCommand(string(out), cwd)
 			if err != nil {
-				return err
+				return StepError{
+					moduleName: step.Module,
+					action:     string(step.Action),
+					err:        err,
+				}
 			}
 		}
-
 	}
 
 	return nil

@@ -20,9 +20,10 @@ var installFlags installCmdFlags
 
 // installCmd represents the install command
 var installCmd = &cobra.Command{
-	Use:     "install",
-	Aliases: []string{"i"},
-	Short:   "Install a module",
+	Use:           "install",
+	Aliases:       []string{"i"},
+	SilenceErrors: true,
+	Short:         "Install a module",
 	Long: `Install a module, given a path (or url) and a type (cmd, filer, vcs, template_engine).
 	----
 	cmd: module that will return a command to be executed.
@@ -30,20 +31,19 @@ var installCmd = &cobra.Command{
 	vcs: module that will run vcs based command like commit and push code.
 	template_engine: module that will handle templating in the folder_struct definition.
 	`,
-	Run: func(cmd *cobra.Command, args []string) {
-		helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) error {
 			var moduleType model.ModuleType
 			moduleType.FromString(installFlags.moduleType)
 			reg := regexp.MustCompile("^(http|https)://.*$")
 			if reg.Match([]byte(installFlags.pathOrURL)) {
 				err := use.InstallModuleFromURL(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
 				if err != nil {
+					return err
 				}
-				return
+				return nil
 			}
-			err := use.InstallModuleFromFS(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
-			if err != nil {
-			}
+			return use.InstallModuleFromFS(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
 		})
 	},
 }

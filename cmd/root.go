@@ -6,6 +6,7 @@ package cmd
 import (
 	"os"
 
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,7 @@ It comes with a plugin system that accepts .wasm files meaning that you can crea
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
+		log.Errorf("something bad happened: %s", err.Error())
 		os.Exit(1)
 	}
 }
