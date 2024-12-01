@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/bootengine/boot/internal/license"
 	"github.com/bootengine/boot/internal/model"
 	"github.com/bootengine/boot/internal/usecase"
 	"github.com/charmbracelet/huh"
@@ -112,6 +114,26 @@ func (r Runner) Run() error {
 	return r.handleSteps()
 }
 
+var NoLicenseSelected = fmt.Errorf("no license selected")
+
+func (r *Runner) createLicense() error {
+	contextValue := r.ctx.Value(ValueKey{}).(map[string]any)
+	selectedLicense, ok := contextValue["license"]
+	if !ok {
+		return NoLicenseSelected
+	}
+
+	licensePath := filepath.Join(contextValue["project_name"].(string), "LICENSE")
+
+	r.ctx = context.WithValue(r.ctx, ValueKey{}, contextValue)
+	content, err := license.GetLicenseContent(r.ctx, selectedLicense.(string))
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(licensePath, []byte(*content), 0664)
+}
+
 func (r *Runner) handleVars() error {
 	values := make(map[string]any)
 	if _, ok := r.workflow.Vars["project_name"]; !ok && r.workflow.Config.CreateRoot {
@@ -147,10 +169,21 @@ func (r *Runner) handleVars() error {
 			values[k] = val
 		case model.License:
 			var val string
-			err := huh.NewSelect[string]().Title("what is the prefered license ?").Options(
-				huh.NewOption("MIT", "mit"),
-				huh.NewOption("GNU GPL v3", "gnugpl3"),
-			).Run()
+			err := huh.NewSelect[string]().Title("what is the prefered license ?").
+				Description(`
+				more info here : https://choosealicense.com/licenses,
+				if the license you want is not in the list, please create an issue () or contribute ()
+				`).
+				Options(
+					huh.NewOption("MIT", "mit"),
+					huh.NewOption("GNU GPL v3", "gnugpl3"),
+					huh.NewOption("GNU AGPL v3", "gnuagpl3"),
+					huh.NewOption("GNU LGPL v3", "gnulgpl3"),
+					huh.NewOption("Mozilla Public License", "mozillapublic"),
+					huh.NewOption("Apache 2.0", "apache2"),
+					huh.NewOption("Boost Software License", "boostsoftware"),
+					huh.NewOption("Unlicense", "unlicense"),
+				).Run()
 			if err != nil {
 				return HuhError{Err: err}
 			}
@@ -169,7 +202,18 @@ func (r *Runner) handleVars() error {
 
 func (r Runner) handleSteps() error {
 	for _, step := range r.workflow.Steps {
-		// find module
+
+		if step.Module == "license" {
+			err := r.createLicense()
+			if err != nil && errors.Is(err, NoLicenseSelected) {
+				// warn user
+			}
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
 		mod, err := r.modCase.RetrieveModule(r.ctx, step.Module)
 		if err != nil {
 			return StepError{
@@ -187,35 +231,9 @@ func (r Runner) handleSteps() error {
 			}
 		}
 
-		manifest := extism.Manifest{
-			Wasm: []extism.Wasm{
-				extism.WasmFile{
-					Name: mod.Name,
-					Path: mod.Path,
-				},
-			},
-		}
-
-		hostFunctions := []extism.HostFunction{}
-		config := extism.PluginConfig{}
-		if mod.Type == model.FilerType {
-			callTemplate := extism.NewHostFunctionWithStack(
-				"callTemplate",
-				r.callTemplateFunc, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR}, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR})
-
-			hostFunctions = append(hostFunctions, callTemplate)
-			if mod.Type == model.FilerType || mod.Type == model.VCSType {
-				config.EnableWasi = true
-			}
-		}
-
-		plugin, err := extism.NewPlugin(r.ctx, manifest, config, hostFunctions)
+		plugin, err := r.createPlugin(step, *mod)
 		if err != nil {
-			return StepError{
-				moduleName: step.Module,
-				action:     string(step.Action),
-				err:        err,
-			}
+			return err
 		}
 		var params []byte
 		if step.Params != nil {
@@ -229,8 +247,6 @@ func (r Runner) handleSteps() error {
 			}
 		}
 
-		// if action is folder_struct, need to get template before
-
 		exit, out, err := plugin.CallWithContext(r.ctx, string(step.Action), params)
 		if err != nil {
 			return StepError{
@@ -239,45 +255,88 @@ func (r Runner) handleSteps() error {
 				err:        err,
 			}
 		}
-		switch mod.Type {
-		case model.FilerType, model.VCSType:
-			if exit != 0 {
-				errString := plugin.GetErrorWithContext(r.ctx)
-				return StepError{
-					moduleName: step.Module,
-					action:     string(step.Action),
-					err:        errors.New(errString),
-				}
-			}
-		// log success
-		case model.CmdType:
-			cwd, err := func() (string, error) {
-				if step.CurrentWorkingDir != "" {
-					return step.CurrentWorkingDir, nil
-				}
-				if r.workflow.Config.CreateRoot {
-					return r.ctx.Value(ValueKey{}).(map[string]any)["project_name"].(string), nil
-				}
-				return os.Getwd()
-			}()
-			if err != nil {
-				return StepError{
-					moduleName: step.Module,
-					action:     string(step.Action),
-					err:        err,
-				}
-			}
-			err = r.executeCommand(string(out), cwd)
-			if err != nil {
-				return StepError{
-					moduleName: step.Module,
-					action:     string(step.Action),
-					err:        err,
-				}
-			}
+
+		if err = r.handleOutput(step, mod.Type, plugin, exit, out); err != nil {
+			return err
+		}
+
+	}
+
+	return nil
+}
+
+func (r Runner) createPlugin(step model.Step, mod model.Module) (*extism.Plugin, error) {
+	manifest := extism.Manifest{
+		Wasm: []extism.Wasm{
+			extism.WasmFile{
+				Name: mod.Name,
+				Path: mod.Path,
+			},
+		},
+	}
+
+	hostFunctions := []extism.HostFunction{}
+	config := extism.PluginConfig{}
+	if mod.Type == model.FilerType {
+		callTemplate := extism.NewHostFunctionWithStack(
+			"callTemplate",
+			r.callTemplateFunc, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR}, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR})
+
+		hostFunctions = append(hostFunctions, callTemplate)
+		if mod.Type == model.FilerType || mod.Type == model.VCSType {
+			config.EnableWasi = true
 		}
 	}
 
+	plugin, err := extism.NewPlugin(r.ctx, manifest, config, hostFunctions)
+	if err != nil {
+		return nil, StepError{
+			moduleName: step.Module,
+			action:     string(step.Action),
+			err:        err,
+		}
+	}
+	return plugin, err
+}
+
+func (r Runner) handleOutput(step model.Step, modType model.ModuleType, plugin *extism.Plugin, exit uint32, out []byte) error {
+	switch modType {
+	case model.FilerType, model.VCSType:
+		if exit != 0 {
+			errString := plugin.GetErrorWithContext(r.ctx)
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        errors.New(errString),
+			}
+		}
+	// log success
+	case model.CmdType:
+		cwd, err := func() (string, error) {
+			if step.CurrentWorkingDir != "" {
+				return step.CurrentWorkingDir, nil
+			}
+			if r.workflow.Config.CreateRoot {
+				return r.ctx.Value(ValueKey{}).(map[string]any)["project_name"].(string), nil
+			}
+			return os.Getwd()
+		}()
+		if err != nil {
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        err,
+			}
+		}
+		err = r.executeCommand(string(out), cwd)
+		if err != nil {
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        err,
+			}
+		}
+	}
 	return nil
 }
 

@@ -37,16 +37,17 @@ func (d DBError) Error() string {
 
 func (m *ModuleGateway) OpenDatabase(databaseUrl string) error {
 	d, err := sql.Open("sqlite", databaseUrl)
-	if err == nil {
-		m.db = d
+	if err != nil {
+		return DBError{
+			action: "open",
+			err:    err,
+		}
 	}
+	m.db = d
 
 	m.DB = goqu.New("sqlite3", m.db)
+	return nil
 
-	return DBError{
-		action: "open",
-		err:    err,
-	}
 }
 
 func (m *ModuleGateway) CloseDatabase() error {
