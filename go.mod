@@ -8,6 +8,18 @@ require (
 )
 
 require (
+	atomicgo.dev/cursor v0.2.0 // indirect
+	atomicgo.dev/keyboard v0.2.9 // indirect
+	atomicgo.dev/schedule v0.1.0 // indirect
+	github.com/containerd/console v1.0.3 // indirect
+	github.com/gookit/color v1.5.4 // indirect
+	github.com/lithammer/fuzzysearch v1.1.8 // indirect
+	github.com/pterm/pterm v0.12.80 // indirect
+	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	golang.org/x/term v0.26.0 // indirect
+)
+
+require (
 	cuelang.org/go v0.10.1 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
@@ -55,7 +67,7 @@ require (
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/sync v0.9.0 // indirect
 	golang.org/x/sys v0.27.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.55.3 // indirect

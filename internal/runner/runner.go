@@ -16,6 +16,7 @@ import (
 	"github.com/bootengine/boot/internal/usecase"
 	"github.com/charmbracelet/huh"
 	extism "github.com/extism/go-sdk"
+	"github.com/pterm/pterm"
 )
 
 type Runner struct {
@@ -202,20 +203,27 @@ func (r *Runner) handleVars() error {
 
 func (r Runner) handleSteps() error {
 	for _, step := range r.workflow.Steps {
-
+		spin, _ := pterm.DefaultSpinner.WithShowTimer(true).Start(step.Name)
 		if step.Module == "license" {
 			err := r.createLicense()
 			if err != nil && errors.Is(err, NoLicenseSelected) {
 				// warn user
+				spin.Warning("failed to create license: no selected license")
 			}
 			if err != nil {
-				return err
+				spin.Fail()
+				return StepError{
+					moduleName: step.Module,
+					action:     string(step.Action),
+					err:        err,
+				}
 			}
 			continue
 		}
 
 		mod, err := r.modCase.RetrieveModule(r.ctx, step.Module)
 		if err != nil {
+			spin.Fail()
 			return StepError{
 				moduleName: step.Module,
 				action:     string(step.Action),
@@ -224,6 +232,7 @@ func (r Runner) handleSteps() error {
 		}
 
 		if !slices.Contains(model.Capabilities[mod.Type], step.Action) {
+			spin.Fail()
 			return StepError{
 				moduleName: step.Module,
 				action:     string(step.Action),
@@ -233,12 +242,18 @@ func (r Runner) handleSteps() error {
 
 		plugin, err := r.createPlugin(step, *mod)
 		if err != nil {
-			return err
+			spin.Fail()
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        err,
+			}
 		}
 		var params []byte
 		if step.Params != nil {
 			params, err = json.Marshal(step.Params)
 			if err != nil {
+				spin.Fail()
 				return StepError{
 					moduleName: step.Module,
 					action:     string(step.Action),
@@ -249,6 +264,7 @@ func (r Runner) handleSteps() error {
 
 		exit, out, err := plugin.CallWithContext(r.ctx, string(step.Action), params)
 		if err != nil {
+			spin.Fail()
 			return StepError{
 				moduleName: step.Module,
 				action:     string(step.Action),
@@ -257,9 +273,15 @@ func (r Runner) handleSteps() error {
 		}
 
 		if err = r.handleOutput(step, mod.Type, plugin, exit, out); err != nil {
-			return err
+			spin.Fail()
+			return StepError{
+				moduleName: step.Module,
+				action:     string(step.Action),
+				err:        err,
+			}
 		}
-
+		spin.Success()
+		spin.Stop()
 	}
 
 	return nil
