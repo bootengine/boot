@@ -83,7 +83,7 @@ func (h HuhError) Error() string {
 
 func (r Runner) checkFolderStructCreation() error {
 	if r.workflow.FolderStruct != nil && !slices.ContainsFunc(r.workflow.Steps, func(elem model.Step) bool {
-		return elem.Module == "filer" && elem.Action == ""
+		return elem.Module == "filer" && elem.Action == model.CreateFolderStructAction
 	}) {
 		err := huh.NewConfirm().Description("a folder_struct is set without explicit step to create it").
 			Title("/!\\ Are you sure ?").
@@ -110,6 +110,14 @@ func (r Runner) Run() error {
 	err = r.handleVars()
 	if err != nil {
 		return err
+	}
+
+	if r.workflow.Config.CreateRoot {
+		projectName := r.ctx.Value(ValueKey{}).(map[string]any)["project_name"].(string)
+		err = os.MkdirAll(projectName, 0775)
+		if err != nil {
+			return fmt.Errorf("failed to create root project directory: %w", err)
+		}
 	}
 
 	return r.handleSteps()
