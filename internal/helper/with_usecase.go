@@ -60,7 +60,7 @@ func getDbURL() (*string, error) {
 	if err != nil {
 		return nil, err
 	}
-	dataDir := filepath.Join(home, "boot", "data")
+	dataDir := filepath.Join(home, "bootengine", "data")
 	err = os.MkdirAll(dataDir, 0755)
 	if err != nil {
 		return nil, err

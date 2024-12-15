@@ -25,7 +25,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/catppuccin/go v0.2.0 // indirect
 	github.com/charmbracelet/bubbles v0.20.0 // indirect
-	github.com/charmbracelet/bubbletea v1.2.3 // indirect
+	github.com/charmbracelet/bubbletea v1.2.4 // indirect
 	github.com/charmbracelet/huh v0.6.0 // indirect
 	github.com/charmbracelet/huh/spinner v0.0.0-20241119235641-e7e76ffbce9f
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect

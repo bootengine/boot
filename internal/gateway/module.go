@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"fmt"
 
 	"github.com/bootengine/boot/internal/model"
@@ -22,6 +23,9 @@ type DBError struct {
 	moduleName, action string
 	err                error
 }
+
+//go:embed init.sql
+var initSQL string
 
 var errNoModuleFound = fmt.Errorf("no module found with this name")
 
@@ -48,6 +52,18 @@ func (m *ModuleGateway) OpenDatabase(databaseUrl string) error {
 	m.DB = goqu.New("sqlite3", m.db)
 	return nil
 
+}
+
+func (m ModuleGateway) InitDatabase() error {
+	if m.DB == nil {
+		fmt.Println("wuuuut")
+	}
+	_, err := m.DB.Exec(initSQL)
+	if err != nil {
+		fmt.Println("error in init")
+	}
+
+	return err
 }
 
 func (m *ModuleGateway) CloseDatabase() error {

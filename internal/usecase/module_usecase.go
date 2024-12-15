@@ -27,7 +27,7 @@ func (m ModuleUsecase) getInstallFolder() (*string, error) {
 		return nil, err
 	}
 
-	installPath := filepath.Join(config, "boot", "plugins")
+	installPath := filepath.Join(config, "bootengine", "plugins")
 
 	return &installPath, nil
 }

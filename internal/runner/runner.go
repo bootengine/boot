@@ -229,6 +229,7 @@ func (r Runner) handleSteps() error {
 			continue
 		}
 
+		var config map[string]string
 		mod, err := r.modCase.RetrieveModule(r.ctx, step.Module)
 		if err != nil {
 			spin.Fail()
@@ -248,7 +249,14 @@ func (r Runner) handleSteps() error {
 			}
 		}
 
-		plugin, err := r.createPlugin(step, *mod)
+		if mod.Type == model.FilerType {
+			data, err := json.Marshal(r.workflow.FolderStruct)
+			if err != nil {
+			}
+			config["folder_struct"] = string(data)
+		}
+
+		plugin, err := r.createPlugin(step, *mod, config)
 		if err != nil {
 			spin.Fail()
 			return StepError{
@@ -257,6 +265,7 @@ func (r Runner) handleSteps() error {
 				err:        err,
 			}
 		}
+
 		var params []byte
 		if step.Params != nil {
 			params, err = json.Marshal(step.Params)
@@ -295,7 +304,7 @@ func (r Runner) handleSteps() error {
 	return nil
 }
 
-func (r Runner) createPlugin(step model.Step, mod model.Module) (*extism.Plugin, error) {
+func (r Runner) createPlugin(step model.Step, mod model.Module, config map[string]string) (*extism.Plugin, error) {
 	manifest := extism.Manifest{
 		Wasm: []extism.Wasm{
 			extism.WasmFile{
@@ -303,10 +312,11 @@ func (r Runner) createPlugin(step model.Step, mod model.Module) (*extism.Plugin,
 				Path: mod.Path,
 			},
 		},
+		Config: config,
 	}
 
 	hostFunctions := []extism.HostFunction{}
-	config := extism.PluginConfig{}
+	pluginConfig := extism.PluginConfig{}
 	if mod.Type == model.FilerType {
 		callTemplate := extism.NewHostFunctionWithStack(
 			"callTemplate",
@@ -314,11 +324,11 @@ func (r Runner) createPlugin(step model.Step, mod model.Module) (*extism.Plugin,
 
 		hostFunctions = append(hostFunctions, callTemplate)
 		if mod.Type == model.FilerType || mod.Type == model.VCSType {
-			config.EnableWasi = true
+			pluginConfig.EnableWasi = true
 		}
 	}
 
-	plugin, err := extism.NewPlugin(r.ctx, manifest, config, hostFunctions)
+	plugin, err := extism.NewPlugin(r.ctx, manifest, pluginConfig, hostFunctions)
 	if err != nil {
 		return nil, StepError{
 			moduleName: step.Module,
