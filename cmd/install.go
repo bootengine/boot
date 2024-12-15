@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"path/filepath"
 	"regexp"
 
 	"github.com/bootengine/boot/internal/helper"
@@ -33,15 +34,23 @@ var installCmd = &cobra.Command{
 	`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) error {
-			var moduleType model.ModuleType
+			var (
+				moduleType model.ModuleType
+				err        error
+			)
 			moduleType.FromString(installFlags.moduleType)
 			reg := regexp.MustCompile("^(http|https)://.*$")
 			if reg.Match([]byte(installFlags.pathOrURL)) {
-				err := use.InstallModuleFromURL(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
+				err = use.InstallModuleFromURL(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
 				if err != nil {
 					return err
 				}
 				return nil
+			} else {
+				installFlags.pathOrURL, err = filepath.Abs(installFlags.pathOrURL)
+				if err != nil {
+					return err
+				}
 			}
 			return use.InstallModuleFromFS(ctx, installFlags.name, moduleType, installFlags.pathOrURL)
 		})

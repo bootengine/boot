@@ -21,6 +21,7 @@ type TemplateDef struct {
 
 type File struct {
 	Name         string
+	Content      string `json:"-"`
 	*TempWrapper `json:",omitempty"`
 }
 
@@ -109,6 +110,48 @@ func (f Folder) IsFile() bool {
 
 type FolderStruct []Filer
 
+type FilerPlugin struct {
+	IsFolder bool
+	Name     string
+	Content  string
+	Children []FilerPlugin
+}
+
+type FolderStructPlugin []FilerPlugin
+
+func (f FolderStruct) ToPluginInput() (string, error) {
+	converted := convert(f)
+
+	data, err := json.Marshal(converted)
+
+	return string(data), err
+}
+
+func convert(f FolderStruct) []FilerPlugin {
+	res := make([]FilerPlugin, len(f))
+	for i, filer := range f {
+		var fp FilerPlugin
+		if filer.IsFile() {
+			data := filer.(File)
+			fp = FilerPlugin{
+				IsFolder: !filer.IsFile(),
+				Name:     data.Name,
+				Content:  data.Content,
+			}
+		} else {
+			data := filer.(Folder)
+			fp = FilerPlugin{
+				IsFolder: !filer.IsFile(),
+				Name:     data.Name,
+				Children: convert(data.Filers),
+			}
+		}
+
+		res[i] = fp
+	}
+	return res
+}
+
 func (f *FolderStruct) UnmarshalJSON(data []byte) error {
 	data = cleanSpaces(data)
 	var (
@@ -194,4 +237,69 @@ func (f *FolderStruct) UnmarshalJSON(data []byte) error {
 		}
 	}
 	return nil
+}
+
+type folderStructType string
+
+const (
+	file   folderStructType = "file"
+	folder folderStructType = "folder"
+)
+
+type jsonFile struct {
+	jsonFiler
+	Spec *struct {
+		Content string `json:"content,omitempty"`
+	} `json:"spec,omitempty"`
+}
+
+type jsonFolder struct {
+	jsonFiler
+	Spec *struct {
+		Children FolderStruct `json:"children,omitempty"`
+	} `json:"spec,omitempty"`
+}
+
+type jsonFiler struct {
+	Name string           `json:"name"`
+	Type folderStructType `json:"type"`
+}
+
+func (f File) MarshalJSON() ([]byte, error) {
+	j := jsonFile{
+		jsonFiler: jsonFiler{
+			Name: f.Name,
+			Type: file,
+		},
+	}
+
+	if f.Content != "" {
+		j.Spec = &struct {
+			Content string "json:\"content,omitempty\""
+		}{
+			Content: f.Content,
+		}
+	}
+
+	return json.Marshal(j)
+}
+
+func (f Folder) MarshalJSON() ([]byte, error) {
+	j := jsonFolder{
+		jsonFiler: jsonFiler{
+			Name: f.Name,
+			Type: folder,
+		},
+	}
+
+	if f.Filers != nil {
+		j.Spec = &struct {
+			Children FolderStruct "json:\"children,omitempty\""
+		}{
+			Children: f.Filers,
+		}
+
+	}
+
+	return json.Marshal(j)
 }

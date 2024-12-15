@@ -4,6 +4,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	"github.com/bootengine/boot/internal/helper"
 	"github.com/bootengine/boot/internal/parser"
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 )
 
@@ -32,6 +33,7 @@ var checkCmd = &cobra.Command{
 		}
 
 		// TODO: log success
+		log.Info("everything is fine !")
 		return nil
 	},
 }

@@ -3,15 +3,17 @@ package license
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bootengine/boot/internal/assets"
+	"github.com/bootengine/boot/internal/helper"
 )
 
 var availableLicenses map[string]string = map[string]string{
-	"mit":           "MIT.License",
+	"mit":           "MIT.LICENSE",
 	"gnugpl3":       "GPL.LICENSE",
 	"gnuagpl3":      "AGPL.LICENSE",
 	"gnulgpl3":      "LGPL.LICENSE",
@@ -24,29 +26,33 @@ var availableLicenses map[string]string = map[string]string{
 func GetLicenseContent(ctx context.Context, licenseName string) (*string, error) {
 	filename, ok := availableLicenses[licenseName]
 	if !ok {
-		return nil, fmt.Errorf("license %s is not available. please create an issue or consider contributing.", licenseName)
+		return nil, fmt.Errorf("license %s is not available. please create an issue or consider contributing", licenseName)
 	}
 
-	licenseFile, err := assets.LicenseFS.ReadFile(filename)
+	licenseFile, err := assets.LicenseFS.ReadFile(filepath.Join("licenses", filename))
 	if err != nil {
 		return nil, err
 	}
 
 	content := string(licenseFile)
-	// template in some case
-	switch licenseName {
-	case "mit":
+	if licenseName == "mit" || licenseName == "apache" {
 		year := time.Now().Year()
-		name := ctx.Value("") // TODO: get value from context or error out
+		name := ctx.Value(helper.ValueKey{}).(map[string]any)["owner"]
+		if name == nil {
+			return nil, fmt.Errorf("for the selected license (%s), an 'owner' must be defined using vars in the config file", licenseName)
+		}
+		var yearString, nameString string
 
-		content = strings.ReplaceAll(content, "[year]", strconv.Itoa(year))
-		content = strings.ReplaceAll(content, "[fullname]", name.(string))
-	case "apache":
-		year := time.Now().Year()
-		name := ctx.Value("") // TODO: get value from context or error out
-
-		content = strings.ReplaceAll(content, "[yyyy]", strconv.Itoa(year))
-		content = strings.ReplaceAll(content, "[name of copyright owner]", name.(string))
+		if licenseName == "mit" {
+			yearString = "[year]"
+			nameString = "[fullname]"
+		}
+		if licenseName == "apache" {
+			yearString = "[yyyy]"
+			nameString = "[name of copyright owner]"
+		}
+		content = strings.ReplaceAll(content, yearString, strconv.Itoa(year))
+		content = strings.ReplaceAll(content, nameString, name.(string))
 	}
 
 	return &content, nil
