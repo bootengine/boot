@@ -53,6 +53,7 @@ if #Step.module >= license {
 	vars?: #Vars
 	steps?: #Steps
 	folder_struct?: #FolderStruct
+	from?: string
 }
 
 workflow: #Workflow

@@ -8,4 +8,5 @@ type Workflow struct {
 	Vars         Vars         `json:"vars"`
 	Steps        []Step       `json:"steps"`
 	FolderStruct FolderStruct `json:"folder_struct"`
+	From         *string      `json:"from"`
 }

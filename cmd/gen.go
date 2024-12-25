@@ -26,39 +26,51 @@ var genCmd = &cobra.Command{
 	Long:          `Generate a new project from a config file. This file can be either on your local computer or it can be a repository.`,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var once sync.Once
-		onceFunc := func() {
-			defer func() {
-				err := cleanup()
-				if err != nil {
-					// panic ?
-				}
-			}()
-		}
 		return helper.WithModuleUsecase(func(ctx context.Context, use *usecase.ModuleUsecase) error {
-			reg := regexp.MustCompile("^(http|https)://.*$")
-			if reg.Match([]byte(genFlags.pathOrURL)) {
-				// dl repo in tmp folder
-				// compute path to tmp/repo/whatever.[yaml|json|toml|...]
-				// defer cleanup
-				once.Do(onceFunc)
-			}
-			work, err := parser.NewParser().Parse(genFlags.pathOrURL)
-			if err != nil {
-				return err
-			}
-
-			worker := runner.NewRunner(use, *work)
-			err = worker.Run()
-			if err != nil {
-				if errors.Is(err, runner.NoKeepGoingError(false)) {
-					once.Do(onceFunc)
-				}
-				return err
-			}
-			return nil
+      return runCmdForSource(ctx, use, &genFlags.pathOrURL)
 		})
 	},
+}
+
+func runCmdForSource (ctx context.Context, use *usecase.ModuleUsecase, source *string) error {
+	var once sync.Once
+	onceFunc := func() {
+		defer func() {
+			err := cleanup()
+			if err != nil {
+				// panic ?
+			}
+		}()
+	}
+
+	reg := regexp.MustCompile("^(http|https)://.*$")
+	if reg.Match([]byte(*source)) {
+		// dl repo in tmp folder
+		// compute path to tmp/repo/whatever.[yaml|json|toml|...]
+		// defer cleanup
+		once.Do(onceFunc)
+	}
+	work, err := parser.NewParser().Parse(*source)
+	if err != nil {
+		return err
+	}
+
+	if work.From != nil {
+		err = runCmdForSource(ctx, use, work.From)
+		if err != nil {
+			return err
+		}
+	}
+
+	worker := runner.NewRunner(use, *work)
+	err = worker.Run()
+	if err != nil {
+		if errors.Is(err, runner.NoKeepGoingError(false)) {
+			once.Do(onceFunc)
+		}
+		return err
+	}
+	return nil
 }
 
 func cleanup() error {
