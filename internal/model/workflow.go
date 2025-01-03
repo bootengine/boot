@@ -1,8 +1,7 @@
+// Package model contains the data representation inside the application
 package model
 
-type TempWorkflow struct {
-}
-
+// Workflow is the result of what has been parsed from user's input.
 type Workflow struct {
 	Config       Config       `json:"config"`
 	Vars         Vars         `json:"vars"`

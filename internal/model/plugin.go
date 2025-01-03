@@ -1,6 +1,9 @@
 package model
 
+// ModuleType is a string that contains the type of a module
 type ModuleType string
+
+// ModuleAction is a string that represent an action performed by a module
 type ModuleAction string
 
 func (p *ModuleType) FromString(s string) {
@@ -29,6 +32,8 @@ const (
 )
 
 var (
+	// Capabilities contains the capabilites between [ModuleType] and [ModuleAction].
+	// It gives the [ModuleAction] a [ModuleType] is capable of.
 	Capabilities = map[ModuleType][]ModuleAction{
 		VCSType: {
 			InitAction,

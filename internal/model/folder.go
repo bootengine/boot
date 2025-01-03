@@ -10,25 +10,31 @@ import (
 	"strings"
 )
 
+// Filer defines the family of types in folder_struct definition.
+// Filer types are either File or Folder.
 type Filer interface {
 	IsFile() bool
 }
 
 type TemplateDef struct {
-	Engine   string
-	Filepath string
+	Engine   string // template engine to run
+	Filepath string // path of the template to apply
 }
 
+// A File is one of the two types that can be defined in folder_struct.
+// It has a Name, and it can have a template definition.
+// The content is retrieved at runtime from the template definition.
 type File struct {
-	Name         string
-	Content      string `json:"-"`
-	*TempWrapper `json:",omitempty"`
+	Name         string              // name of the file
+	Content      string              `json:"-"` // content of the file
+	*TempWrapper `json:",omitempty"` // template definition of the file
 }
 
 type TempWrapper struct {
 	TemplateDef `json:"template"`
 }
 
+// UnmarshalJSON implementes encoding/json.Unmarshaller on File type
 func (f *File) UnmarshalJSON(data []byte) error {
 	reg := regexp.MustCompile(`\{.+\}`)
 	if reg.Match(data) {
@@ -61,10 +67,13 @@ func (f *File) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// IsFile implements the Filer interface on File type.
 func (f File) IsFile() bool {
 	return true
 }
 
+// A Folder is one of the two types that can be defined in folder_struct.
+// It has a Name, and it can have children as an array of Filer.
 type Folder struct {
 	Name   string
 	Filers FolderStruct
@@ -80,6 +89,7 @@ func cleanSpaces(data []byte) []byte {
 	return data
 }
 
+// UnmarshalJSON implementes encoding/json.Unmarshaller on Folder type
 func (f *Folder) UnmarshalJSON(data []byte) error {
 	data = cleanSpaces(data)
 	reg := regexp.MustCompile(`\{.+\}`)
@@ -106,54 +116,15 @@ func (f *Folder) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// IsFile implements the Filer interface on Folder type.
 func (f Folder) IsFile() bool {
 	return false
 }
 
+// FolderStruct is a user-defined folder_struct. It's just an array of Filer.
 type FolderStruct []Filer
 
-type FilerPlugin struct {
-	IsFolder bool
-	Name     string
-	Content  string
-	Children []FilerPlugin
-}
-
-type FolderStructPlugin []FilerPlugin
-
-func (f FolderStruct) ToPluginInput() (string, error) {
-	converted := convert(f)
-
-	data, err := json.Marshal(converted)
-
-	return string(data), err
-}
-
-func convert(f FolderStruct) []FilerPlugin {
-	res := make([]FilerPlugin, len(f))
-	for i, filer := range f {
-		var fp FilerPlugin
-		if filer.IsFile() {
-			data := filer.(File)
-			fp = FilerPlugin{
-				IsFolder: !filer.IsFile(),
-				Name:     data.Name,
-				Content:  data.Content,
-			}
-		} else {
-			data := filer.(Folder)
-			fp = FilerPlugin{
-				IsFolder: !filer.IsFile(),
-				Name:     data.Name,
-				Children: convert(data.Filers),
-			}
-		}
-
-		res[i] = fp
-	}
-	return res
-}
-
+// UnmarshalJSON implementes encoding/json.Unmarshaller on FolderStruct type
 func (f *FolderStruct) UnmarshalJSON(data []byte) error {
 	data = cleanSpaces(data)
 	var (

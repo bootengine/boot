@@ -1,13 +1,12 @@
 package model
 
-// Vars is an array of `Var`
-// the key is the name of the var inside the workflow
-// the value is a `Var` with the type of var and a required flag
+// Vars is an array of [Var]
 type Vars []Var
 
-// ValueType define the type a `Var` can have.
+// ValueType define the type a [Var] can have.
 type ValueType string
 
+// Var is a user-defined variable in a [Workflow]. It has a Name, a Type ([ValueType]) and a flag if Required.
 type Var struct {
 	Name     string    `json:"name"`
 	Type     ValueType `json:"type"`
