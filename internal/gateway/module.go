@@ -1,3 +1,4 @@
+// Package gateway is used to interact with databases.
 package gateway
 
 import (
@@ -12,6 +13,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// A ModuleGateway is used to manage modules inside the database.
 type ModuleGateway struct {
 	db *sql.DB
 	DB *goqu.Database
@@ -19,6 +21,8 @@ type ModuleGateway struct {
 
 const tablename = "module"
 
+// A DBError occurs when something wrong happens in database operations.
+// This type might evolve later since it contains module related data
 type DBError struct {
 	moduleName, action string
 	err                error
@@ -29,6 +33,7 @@ var initSQL string
 
 var errNoModuleFound = fmt.Errorf("no module found with this name")
 
+// Error implements the [Error] interface
 func (d DBError) Error() string {
 	if d.action == "open" || d.action == "close" {
 		return fmt.Sprintf("failed to %s module database: %s", d.action, d.err.Error())
@@ -39,6 +44,7 @@ func (d DBError) Error() string {
 	return fmt.Sprintf("failed to %s module %s: %s", d.action, d.moduleName, d.err.Error())
 }
 
+// OpenDatabase open a connection to a sqlite database.
 func (m *ModuleGateway) OpenDatabase(databaseUrl string) error {
 	d, err := sql.Open("sqlite", databaseUrl)
 	if err != nil {
@@ -54,6 +60,8 @@ func (m *ModuleGateway) OpenDatabase(databaseUrl string) error {
 
 }
 
+// InitDatabase execute the init script to create tables.
+// TODO: better error handling
 func (m ModuleGateway) InitDatabase() error {
 	if m.DB == nil {
 		fmt.Println("wuuuut")
@@ -66,6 +74,7 @@ func (m ModuleGateway) InitDatabase() error {
 	return err
 }
 
+// CloseDatabase close the connection to the database.
 func (m *ModuleGateway) CloseDatabase() error {
 	err := m.db.Close()
 	if err != nil {
@@ -81,6 +90,7 @@ func NewModuleGateway() (*ModuleGateway, error) {
 	return &ModuleGateway{}, nil
 }
 
+// AddModule is used to insert a [model.Module] inside the database.
 func (m ModuleGateway) AddModule(ctx context.Context, module model.Module) error {
 	ex := m.DB.Insert(tablename).Prepared(true).Rows(module).Executor()
 	if _, err := ex.ExecContext(ctx); err != nil {
@@ -94,6 +104,7 @@ func (m ModuleGateway) AddModule(ctx context.Context, module model.Module) error
 	return nil
 }
 
+// GetModule is used to retrieave a [model.Module] from the database, using its name.
 func (m ModuleGateway) GetModule(ctx context.Context, moduleName string) (*model.Module, error) {
 	var res model.Module
 	found, err := m.DB.From(tablename).Select(goqu.Star()).Where(
@@ -121,6 +132,7 @@ func (m ModuleGateway) GetModule(ctx context.Context, moduleName string) (*model
 	return &res, err
 }
 
+// GetModule is used to retrieave every installed [model.Module] from the database.
 func (m ModuleGateway) ListModules(ctx context.Context) ([]model.Module, error) {
 	var res []model.Module
 	err := m.DB.From(tablename).Select(goqu.Star()).ScanStructsContext(ctx, &res)
@@ -133,6 +145,7 @@ func (m ModuleGateway) ListModules(ctx context.Context) ([]model.Module, error) 
 	return res, err
 }
 
+// UpdateModulePath is used to update the path to a [model.Module] in the database.
 func (m ModuleGateway) UpdateModulePath(ctx context.Context, moduleName, modulePath string) error {
 	ex := m.DB.Update(tablename).Prepared(true).Where(goqu.C("module_name").Eq(moduleName)).Set(goqu.Record{
 		"module_path": modulePath,
@@ -161,6 +174,7 @@ func (m ModuleGateway) UpdateModulePath(ctx context.Context, moduleName, moduleP
 	return nil
 }
 
+// RemoveModule is used to remove a [model.Module] in the database using its name.
 func (m ModuleGateway) RemoveModule(ctx context.Context, moduleName string) error {
 	ex := m.DB.From(tablename).Delete().Prepared(true).Where(goqu.C("module_name").Eq(moduleName)).Executor()
 	if r, err := ex.ExecContext(ctx); err != nil {
