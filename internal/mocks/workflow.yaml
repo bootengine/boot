@@ -2,18 +2,15 @@ config:
   create_root: true
   unrestricted: false
 vars:
-  project_name: 
+  - name: project_name
     type: string
     required: true
-  author_github_name: 
+  - name: author_github_name
     type: string
     required: true
-  license: 
+  - name: license
     type: license
     required: false
-
-# need support key:value ?
-
 steps:
   - name: git init
     module: git

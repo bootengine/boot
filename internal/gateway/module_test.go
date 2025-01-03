@@ -74,7 +74,7 @@ func Test_AddModule(t *testing.T) {
 					Path: "~/Documents/test.html",
 					Type: "fziuherfuh",
 				},
-				expectedErr: `module_type IN ("module", "filer", "vcs","template_engine")`,
+				expectedErr: `module_type IN ("cmd", "filer", "vcs","template_engine")`,
 			},
 		}
 
@@ -103,12 +103,12 @@ func Test_ListModule(t *testing.T) {
 		m1 := model.Module{
 			Name: "go",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 		m2 := model.Module{
 			Name: "node",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 
 		err := gt.AddModule(ctx, m1)
@@ -132,17 +132,17 @@ func Test_GetModule(t *testing.T) {
 		m1 := model.Module{
 			Name: "go",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 		m2 := model.Module{
 			Name: "node",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 		m3 := model.Module{
 			Name: "python",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 
 		err := gt.AddModule(ctx, m1)
@@ -159,7 +159,7 @@ func Test_GetModule(t *testing.T) {
 
 		got, err = gt.GetModule(ctx, "vuejs")
 		td.Cmp(t, got, td.Nil())
-		td.CmpContains(t, err, "module not found")
+		td.CmpContains(t, err, "no module found with this name")
 
 	})
 }
@@ -171,17 +171,17 @@ func Test_UpdateModule(t *testing.T) {
 		m1 := model.Module{
 			Name: "go",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 		m2 := model.Module{
 			Name: "node",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 		m3 := model.Module{
 			Name: "python",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 
 		err := gt.AddModule(ctx, m1)
@@ -209,17 +209,17 @@ func Test_DeleteModule(t *testing.T) {
 		m1 := model.Module{
 			Name: "go",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 		m2 := model.Module{
 			Name: "node",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 		m3 := model.Module{
 			Name: "python",
 			Path: "./tmp",
-			Type: "module",
+			Type: "cmd",
 		}
 
 		err := gt.AddModule(ctx, m1)

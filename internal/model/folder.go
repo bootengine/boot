@@ -70,6 +70,8 @@ type Folder struct {
 	Filers FolderStruct
 }
 
+// cleanSpaces removes all spaces and newline.
+// the result should be a []byte containing an inlined string without spaces.
 func cleanSpaces(data []byte) []byte {
 	s := string(data)
 	s = strings.ReplaceAll(s, "\n", "")

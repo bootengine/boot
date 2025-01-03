@@ -1,13 +1,15 @@
 package model
 
-// Vars is a map
+// Vars is an array of `Var`
 // the key is the name of the var inside the workflow
 // the value is a `Var` with the type of var and a required flag
-type Vars map[string]Var
+type Vars []Var
 
+// ValueType define the type a `Var` can have.
 type ValueType string
 
 type Var struct {
+	Name     string    `json:"name"`
 	Type     ValueType `json:"type"`
 	Required bool      `json:"required"`
 }

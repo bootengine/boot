@@ -147,7 +147,7 @@ func (r *Runner) createLicense() error {
 
 func (r *Runner) handleVars() error {
 	values := make(map[string]any)
-	if _, ok := r.workflow.Vars["project_name"]; !ok && r.workflow.Config.CreateRoot {
+	if ok := slices.ContainsFunc(r.workflow.Vars, func(elem model.Var) bool { return elem.Name == "project_name" }); !ok && r.workflow.Config.CreateRoot {
 		err := huh.NewConfirm().Description("the project needs a name, convention is forcing on a 'project_name' var").
 			Title("/!\\ Caution !").
 			Affirmative("Ok").
@@ -162,22 +162,22 @@ func (r *Runner) handleVars() error {
 		}
 	}
 
-	for k, v := range r.workflow.Vars {
+	for _, v := range r.workflow.Vars {
 		switch v.Type {
 		case model.String:
 			var val string
-			err := huh.NewInput().Title(fmt.Sprintf("what is your %s ?", k)).Value(&val).Run()
+			err := huh.NewInput().Title(fmt.Sprintf("what is your %s ?", v.Name)).Value(&val).Run()
 			if err != nil {
 				return HuhError{Err: err}
 			}
-			values[k] = val
+			values[v.Name] = val
 		case model.Password:
 			var val string
-			err := huh.NewInput().Title(fmt.Sprintf("what is your %s ?", k)).EchoMode(huh.EchoModePassword).Value(&val).Run()
+			err := huh.NewInput().Title(fmt.Sprintf("what is your %s ?", v.Name)).EchoMode(huh.EchoModePassword).Value(&val).Run()
 			if err != nil {
 				return HuhError{Err: err}
 			}
-			values[k] = val
+			values[v.Name] = val
 		case model.License:
 			var val string
 			err := huh.NewSelect[string]().Title("what is the prefered license ?").
@@ -198,11 +198,11 @@ func (r *Runner) handleVars() error {
 			if err != nil {
 				return HuhError{Err: err}
 			}
-			values[k] = val
+			values[v.Name] = val
 		default:
 			return VarError{
 				err:  fmt.Errorf("%s type of var is not managed by boot", v.Type),
-				vars: k,
+				vars: v.Name,
 			}
 		}
 	}
@@ -212,6 +212,22 @@ func (r *Runner) handleVars() error {
 }
 
 func (r Runner) handleSteps() error {
+	r.workflow.FolderStruct = r.getContent(r.workflow.FolderStruct)
+	testFile := r.workflow.FolderStruct[0].(model.Folder).Filers[2].(model.File)
+	log.Error("folder_struct =>", "name", testFile.Name, "content", testFile.Content, "tempdef", testFile.TempWrapper)
+
+	jsonFS, err := json.Marshal(r.workflow.FolderStruct)
+	log.Error(string(jsonFS))
+	if err != nil {
+		return fmt.Errorf("error happened while preparing folder_struct for filer plugin: %w", err)
+	}
+
+	values := r.ctx.Value(helper.ValueKey{}).(map[string]any)
+	jsonValues, err := json.Marshal(values)
+	if err != nil {
+		return fmt.Errorf("error happened while preparing variables for plugins: %w", err)
+	}
+
 	for _, step := range r.workflow.Steps {
 		if step.Module == "license" {
 			err := r.createLicense()
@@ -248,11 +264,10 @@ func (r Runner) handleSteps() error {
 		}
 
 		if mod.Type == model.FilerType {
-			data1, _ := json.Marshal(r.workflow.FolderStruct)
-			config["folder_struct"] = string(data1)
-			// data2, _ := r.workflow.FolderStruct.ToPluginInput()
-			// config["folder_struct"] = string(data2)
+			config["folder_struct"] = string(jsonFS)
 		}
+
+		config["values"] = string(jsonValues)
 
 		plugin, err := r.createPlugin(step, *mod, config)
 		if err != nil {
@@ -262,6 +277,8 @@ func (r Runner) handleSteps() error {
 				err:        err,
 			}
 		}
+
+		setLogger(plugin, step)
 
 		var params []byte
 		if step.Params != nil {
@@ -274,25 +291,6 @@ func (r Runner) handleSteps() error {
 				}
 			}
 		}
-		extism.SetLogLevel(extism.LogLevelTrace)
-
-		plugin.SetLogger(func(ll extism.LogLevel, s string) {
-			log.NewWithOptions(os.Stdout, log.Options{
-				ReportCaller:    true,
-				ReportTimestamp: true,
-				Prefix:          fmt.Sprintf("plugin-%s", step.Name),
-			})
-			switch ll {
-			case extism.LogLevelDebug:
-				log.Debug(s)
-			case extism.LogLevelInfo:
-				log.Info(s)
-			case extism.LogLevelWarn:
-				log.Warn(s)
-			case extism.LogLevelError:
-				log.Error(s)
-			}
-		})
 
 		exit, out, err := plugin.CallWithContext(r.ctx, string(step.Action), params)
 		if err != nil {
@@ -421,6 +419,72 @@ func (r Runner) checkCommandContent(cmd string) bool {
 	return true
 }
 
+// TODO: better error handling
+func (r Runner) getTemplate(tempEngine, tempPath string) (string, error) {
+	values := r.ctx.Value(helper.ValueKey{}).(map[string]any)
+	jsonValues, err := json.Marshal(values)
+	if err != nil {
+		return "", fmt.Errorf("error happened while preparing variables for plugins: %w", err)
+	}
+
+	mod, err := r.modCase.RetrieveModule(r.ctx, tempEngine)
+	if err != nil {
+		return "", err
+	}
+
+	if mod.Type != model.TempEngineType {
+		return "", fmt.Errorf("the module installed with name %s is not a template engine module", tempEngine)
+	}
+	manifest := extism.Manifest{
+		Wasm: []extism.Wasm{
+			extism.WasmFile{
+				Name: mod.Name,
+				Path: mod.Path,
+			},
+		},
+		Config: map[string]string{
+			"values": string(jsonValues),
+		},
+	}
+	config := extism.PluginConfig{
+		EnableWasi: true,
+	}
+	plugin, err := extism.NewPlugin(r.ctx, manifest, config, []extism.HostFunction{})
+	if err != nil {
+		return "", err
+	}
+
+	fileContent, err := os.ReadFile(tempPath)
+	if err != nil {
+		return "", err
+	}
+
+	setLogger(plugin, model.Step{
+		Name: fmt.Sprintf("apply template using %s on %s", tempEngine, tempPath),
+	})
+
+	input := struct {
+		Template string         `json:"template"`
+		Values   map[string]any `json:"values"`
+	}{
+		Template: string(fileContent),
+		Values:   values,
+	}
+
+	data, _ := json.Marshal(input)
+
+	ex, out, err := plugin.CallWithContext(r.ctx, "render", data)
+	if ex == 0 {
+		if err != nil {
+			panic(fmt.Sprintf("the filer plugin failed to retrieve data from the template engine %s: %s", mod.Name, err.Error()))
+		}
+	} else {
+		errString := plugin.GetErrorWithContext(r.ctx)
+		return "", fmt.Errorf("template plugin exited with error status: %s", errString)
+	}
+	return string(out), nil
+}
+
 func (r Runner) callTemplateFunc(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
 	handleErr := func(msg []byte) {
 		var err error
@@ -481,4 +545,53 @@ func (r Runner) callTemplateFunc(ctx context.Context, p *extism.CurrentPlugin, s
 		errString := plugin.GetErrorWithContext(r.ctx)
 		handleErr([]byte(fmt.Sprintf("template plugin exited with error status: %s", errString)))
 	}
+}
+
+func setLogger(plugin *extism.Plugin, step model.Step) {
+	extism.SetLogLevel(extism.LogLevelTrace) // TODO: Change log level when prod-ready
+
+	plugin.SetLogger(func(ll extism.LogLevel, s string) {
+		log.NewWithOptions(os.Stdout, log.Options{
+			ReportCaller:    true,
+			ReportTimestamp: true,
+			Prefix:          fmt.Sprintf("plugin-%s", step.Name),
+		})
+		switch ll {
+		case extism.LogLevelDebug:
+			log.Debug(s)
+		case extism.LogLevelInfo:
+			log.Info(s)
+		case extism.LogLevelWarn:
+			log.Warn(s)
+		case extism.LogLevelError:
+			log.Error(s)
+		}
+	})
+}
+
+func (r Runner) getContent(fs model.FolderStruct) model.FolderStruct {
+	l := log.NewWithOptions(os.Stdout, log.Options{Level: log.DebugLevel, Prefix: "get-content"})
+	for i, f := range fs {
+		if f.IsFile() {
+			file := f.(model.File)
+			l.Debug(file.Name)
+			if file.TempWrapper != nil {
+				content, err := r.getTemplate(file.Engine, file.Filepath)
+				l.Debugf("content = %s", content)
+				if err != nil {
+					l.Errorf("failed to get template: %s", err.Error())
+				}
+				file.Content = content
+				fs[i] = file
+				l.Debugf("file content = %s", file.Content)
+			}
+		} else {
+			folder := f.(model.Folder)
+			l.Debug(folder.Name)
+			if len(folder.Filers) > 0 {
+				folder.Filers = r.getContent(folder.Filers)
+			}
+		}
+	}
+	return fs
 }

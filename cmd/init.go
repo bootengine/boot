@@ -61,11 +61,13 @@ func newDefaultWorkflow() model.Workflow {
 			CreateRoot: true,
 		},
 		Vars: model.Vars{
-			"project_name": model.Var{
+			model.Var{
+				Name:     "project_name",
 				Required: true,
 				Type:     model.String,
 			},
-			"license": model.Var{
+			model.Var{
+				Name:     "license",
 				Required: true,
 				Type:     model.License,
 			},

@@ -17,15 +17,18 @@ func TestParser_Parse(t *testing.T) {
 			Unrestricted: false,
 		},
 		Vars: model.Vars{
-			"project_name": model.Var{
+			model.Var{
+				Name:     "project_name",
 				Type:     model.String,
 				Required: true,
 			},
-			"author_github_name": model.Var{
+			model.Var{
+				Name:     "author_github_name",
 				Type:     model.String,
 				Required: true,
 			},
-			"license": model.Var{
+			model.Var{
+				Name:     "license",
 				Type:     model.License,
 				Required: false,
 			},

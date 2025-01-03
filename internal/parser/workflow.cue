@@ -4,13 +4,12 @@
 }
 
 #Var : {
+	name: string
 	type: "string" | "license" | "password"
 	required: bool
 }
 
-#Vars: [string]:{
-	#Var
-}
+#Vars: [...#Var]
 
 
 #StepAction: "init" | "install-local-deps" | "install-global-deps" | "install-dev-deps" | "commit"| "push"| "add"| "add-origin"| "create-file"| "create-folder"| "write-file"| "apply-template" | "create-folder-struct"
