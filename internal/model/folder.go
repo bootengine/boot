@@ -276,3 +276,22 @@ func (f Folder) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(j)
 }
+
+func (f FolderStruct) Convert() GeneratingFolderStruct {
+	res := make([]any, len(f))
+	for i, filer := range f {
+		if filer.IsFile() {
+			file := filer.(File)
+			res[i] = file.Name
+		} else {
+			folder := filer.(Folder)
+			convertedFolder := make(map[string][]any)
+			convertedFolder[folder.Name] = folder.Filers.Convert()
+			res[i] = convertedFolder
+		}
+	}
+
+	return res
+}
+
+type GeneratingFolderStruct []any

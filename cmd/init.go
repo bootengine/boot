@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"os"
 
-	"cuelang.org/go/cue/cuecontext"
-	"cuelang.org/go/encoding/yaml"
+	"gopkg.in/yaml.v3"
+	//"cuelang.org/go/encoding/yaml"
 	"github.com/bootengine/boot/internal/helper"
 	"github.com/bootengine/boot/internal/model"
 	"github.com/spf13/cobra"
@@ -26,17 +26,23 @@ var initCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		workflow := newDefaultWorkflow()
+
+		gen := model.GeneratingWorkflow{
+			Config:       workflow.Config,
+			Vars:         workflow.Vars,
+			Steps:        workflow.Steps,
+			FolderStruct: workflow.FolderStruct.Convert(),
+		}
+
 		var (
 			marshaled []byte
 			err       error
 		)
 		switch initFlags.outputType {
 		case helper.JSON:
-			marshaled, err = json.Marshal(workflow)
+			marshaled, err = json.Marshal(gen)
 		case helper.YAML:
-			ctx := cuecontext.New()
-			val := ctx.Encode(workflow)
-			marshaled, err = yaml.Encode(val)
+			marshaled, err = yaml.Marshal(gen)
 		}
 
 		if err != nil {

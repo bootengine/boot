@@ -8,3 +8,10 @@ type Workflow struct {
 	Steps        []Step       `json:"steps"`
 	FolderStruct FolderStruct `json:"folder_struct"`
 }
+
+type GeneratingWorkflow struct {
+	Config       Config                 `json:"config"`
+	Vars         Vars                   `json:"vars"`
+	Steps        []Step                 `json:"steps"`
+	FolderStruct GeneratingFolderStruct `json:"folder_struct" yaml:"folder_struct"`
+}

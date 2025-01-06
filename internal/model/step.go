@@ -7,6 +7,6 @@ type Step struct {
 	Name              string
 	Module            string
 	Action            ModuleAction
-	CurrentWorkingDir string   `json:"cwd,omitempty"`
-	Params            []string `json:"params,omitempty"`
+	CurrentWorkingDir string   `json:"cwd,omitempty" yaml:"cwd,omitempty"`
+	Params            []string `json:"params,omitempty" yaml:"params,omitempty"`
 }
