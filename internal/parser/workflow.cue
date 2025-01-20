@@ -12,7 +12,7 @@
 #Vars: [...#Var]
 
 
-#StepAction: "init" | "install-local-deps" | "install-global-deps" | "install-dev-deps" | "commit"| "push"| "add"| "add-origin"| "create-file"| "create-folder"| "write-file"| "apply-template" | "create-folder-struct"
+#StepAction: "init" | "installLocalDeps" | "installGlobalDeps" | "installDevDeps" | "commit"| "push"| "add"| "addOrigin"| "createFile"| "createFolder"| "writeFile"| "applyTemplate" | "createFolderStruct"
 
 #Step : {
 	name!: string

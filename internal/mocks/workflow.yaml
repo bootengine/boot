@@ -20,7 +20,7 @@ steps:
     action: init
   - name: go get deps
     module: go
-    action: install-local-deps
+    action: installLocalDeps
     cwd: frontend
     params:
       - github.com/charmbracelet/bubbletea

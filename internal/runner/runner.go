@@ -212,12 +212,10 @@ func (r *Runner) handleVars() error {
 }
 
 func (r Runner) handleSteps() error {
-	r.workflow.FolderStruct = r.getContent(r.workflow.FolderStruct)
-	testFile := r.workflow.FolderStruct[0].(model.Folder).Filers[2].(model.File)
-	log.Error("folder_struct =>", "name", testFile.Name, "content", testFile.Content, "tempdef", testFile.TempWrapper)
-
+	if len(r.workflow.FolderStruct) > 0 {
+		r.workflow.FolderStruct = r.getContent(r.workflow.FolderStruct)
+	}
 	jsonFS, err := json.Marshal(r.workflow.FolderStruct)
-	log.Error(string(jsonFS))
 	if err != nil {
 		return fmt.Errorf("error happened while preparing folder_struct for filer plugin: %w", err)
 	}
@@ -335,6 +333,7 @@ func (r Runner) createPlugin(step model.Step, mod model.Module, config map[strin
 	hostFunctions := []extism.HostFunction{}
 	pluginConfig := extism.PluginConfig{
 		ModuleConfig: wazero.NewModuleConfig(),
+		EnableWasi:   true,
 	}
 	if mod.Type == model.FilerType {
 		callTemplate := extism.NewHostFunctionWithStack(
@@ -342,9 +341,6 @@ func (r Runner) createPlugin(step model.Step, mod model.Module, config map[strin
 			r.callTemplateFunc, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR}, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR})
 
 		hostFunctions = append(hostFunctions, callTemplate)
-		if mod.Type == model.FilerType || mod.Type == model.VCSType {
-			pluginConfig.EnableWasi = true
-		}
 	}
 
 	plugin, err := extism.NewPlugin(r.ctx, manifest, pluginConfig, hostFunctions)
@@ -405,7 +401,8 @@ func (r Runner) executeCommand(cmd string, cwd string) error {
 		return fmt.Errorf("plugin is trying to execute a suspicious command: %s", cmd)
 	}
 
-	command := exec.CommandContext(r.ctx, cmd)
+	cmdWithArgs := strings.Split(cmd, " ")
+	command := exec.CommandContext(r.ctx, cmdWithArgs[0], cmdWithArgs[1:]...)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 
 	command.Dir = cwd

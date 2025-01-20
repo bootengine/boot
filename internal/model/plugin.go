@@ -17,18 +17,18 @@ const (
 	VCSType        ModuleType = "vcs"
 
 	InitAction               ModuleAction = "init"
-	InstallLocalDepsAction   ModuleAction = "install-local-deps"
-	InstallGlobalDepsAction  ModuleAction = "install-global-deps"
-	InstallDevDepsAction     ModuleAction = "install-dev-deps"
+	InstallLocalDepsAction   ModuleAction = "installLocalDeps"
+	InstallGlobalDepsAction  ModuleAction = "installGlobalDeps"
+	InstallDevDepsAction     ModuleAction = "installDevDeps"
 	CommitAction             ModuleAction = "commit"
 	PushAction               ModuleAction = "push"
 	VCSAddAction             ModuleAction = "add"
-	AddOriginAction          ModuleAction = "add-origin"
-	CreateFileAction         ModuleAction = "create-file"
-	CreateFolderAction       ModuleAction = "create-folder"
-	CreateFolderStructAction ModuleAction = "create-folder-struct"
-	WriteFileAction          ModuleAction = "write-file"
-	FormatTemplAction        ModuleAction = "apply-template"
+	AddOriginAction          ModuleAction = "addOrigin"
+	CreateFileAction         ModuleAction = "createFile"
+	CreateFolderAction       ModuleAction = "createFolder"
+	CreateFolderStructAction ModuleAction = "createFolderStruct"
+	WriteFileAction          ModuleAction = "writeFile"
+	FormatTemplAction        ModuleAction = "applyTemplate"
 )
 
 var (
