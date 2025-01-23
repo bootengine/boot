@@ -369,13 +369,23 @@ func (r Runner) handleOutput(step model.Step, modType model.ModuleType, plugin *
 	// log success
 	case model.CmdType:
 		cwd, err := func() (string, error) {
-			if step.CurrentWorkingDir != "" {
-				return step.CurrentWorkingDir, nil
+			cwd, err := os.Getwd()
+			if err != nil {
+				return "", err
 			}
+			pn := r.ctx.Value(helper.ValueKey{}).(map[string]any)["project_name"].(string)
+
 			if r.workflow.Config.CreateRoot {
-				return r.ctx.Value(helper.ValueKey{}).(map[string]any)["project_name"].(string), nil
+				cwd = filepath.Join(cwd, pn)
 			}
-			return os.Getwd()
+
+			if step.CurrentWorkingDir != "" {
+				if filepath.IsAbs(step.CurrentWorkingDir) {
+					return step.CurrentWorkingDir, nil
+				}
+				return filepath.Join(cwd, step.CurrentWorkingDir), nil
+			}
+			return cwd, nil
 		}()
 		if err != nil {
 			return StepError{
@@ -386,6 +396,7 @@ func (r Runner) handleOutput(step model.Step, modType model.ModuleType, plugin *
 		}
 		err = r.executeCommand(string(out), cwd)
 		if err != nil {
+			fmt.Println("error while running command")
 			return StepError{
 				moduleName: step.Module,
 				action:     string(step.Action),
@@ -402,10 +413,18 @@ func (r Runner) executeCommand(cmd string, cwd string) error {
 	}
 
 	cmdWithArgs := strings.Split(cmd, " ")
+	_, err := exec.LookPath(cmdWithArgs[0])
+	if err != nil {
+		fmt.Println("failed to find exec :", cmdWithArgs[0])
+		return err
+	}
+
 	command := exec.CommandContext(r.ctx, cmdWithArgs[0], cmdWithArgs[1:]...)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-
 	command.Dir = cwd
+
+	// TODO: Should print here or in the caller the command and the cwd
+
 	return command.Run()
 }
 
