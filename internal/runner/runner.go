@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -119,8 +120,6 @@ func (r Runner) Run() error {
 			return fmt.Errorf("failed to create root project directory: %w", err)
 		}
 	}
-
-	// TODO: call template engine and change template data to content
 
 	return r.handleSteps()
 }
@@ -324,26 +323,18 @@ func (r Runner) createPlugin(step model.Step, mod model.Module, config map[strin
 
 	projectName := r.ctx.Value(helper.ValueKey{}).(map[string]any)["project_name"].(string)
 
-	if mod.Type == model.FilerType || mod.Type == model.VCSType {
+	if mod.Type == model.FilerType { //|| mod.Type == model.VCSType
 		manifest.AllowedPaths = map[string]string{
 			projectName: "/app",
 		}
 	}
 
-	hostFunctions := []extism.HostFunction{}
 	pluginConfig := extism.PluginConfig{
 		ModuleConfig: wazero.NewModuleConfig(),
 		EnableWasi:   true,
 	}
-	if mod.Type == model.FilerType {
-		callTemplate := extism.NewHostFunctionWithStack(
-			"callTemplate",
-			r.callTemplateFunc, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR}, []extism.ValueType{extism.ValueTypePTR, extism.ValueTypePTR})
 
-		hostFunctions = append(hostFunctions, callTemplate)
-	}
-
-	plugin, err := extism.NewPlugin(r.ctx, manifest, pluginConfig, hostFunctions)
+	plugin, err := extism.NewPlugin(r.ctx, manifest, pluginConfig, nil)
 	if err != nil {
 		return nil, StepError{
 			moduleName: step.Module,
@@ -356,7 +347,7 @@ func (r Runner) createPlugin(step model.Step, mod model.Module, config map[strin
 
 func (r Runner) handleOutput(step model.Step, modType model.ModuleType, plugin *extism.Plugin, exit uint32, out []byte) error {
 	switch modType {
-	case model.FilerType, model.VCSType:
+	case model.FilerType:
 		if exit != 0 {
 			errString := plugin.GetErrorWithContext(r.ctx)
 			return StepError{
@@ -367,7 +358,7 @@ func (r Runner) handleOutput(step model.Step, modType model.ModuleType, plugin *
 		}
 		log.Infof("%s succeed", step.Name)
 	// log success
-	case model.CmdType:
+	case model.CmdType, model.VCSType:
 		cwd, err := func() (string, error) {
 			cwd, err := os.Getwd()
 			if err != nil {
@@ -396,7 +387,6 @@ func (r Runner) handleOutput(step model.Step, modType model.ModuleType, plugin *
 		}
 		err = r.executeCommand(string(out), cwd)
 		if err != nil {
-			fmt.Println("error while running command")
 			return StepError{
 				moduleName: step.Module,
 				action:     string(step.Action),
@@ -411,15 +401,38 @@ func (r Runner) executeCommand(cmd string, cwd string) error {
 	if !r.workflow.Config.Unrestricted && !r.checkCommandContent(cmd) {
 		return fmt.Errorf("plugin is trying to execute a suspicious command: %s", cmd)
 	}
+	reg := regexp.MustCompile(`(".*"?)`)
 
-	cmdWithArgs := strings.Split(cmd, " ")
-	_, err := exec.LookPath(cmdWithArgs[0])
+	quotedArgs := reg.FindAllString(cmd, -1)
+
+	counter := 0
+
+	pattern := "$%v$"
+
+	cmd = reg.ReplaceAllStringFunc(cmd, func(_ string) string {
+		res := fmt.Sprintf(pattern, counter)
+		counter++
+		return res
+	})
+
+	counter = 0
+
+	splittedCmd := strings.Fields(cmd)
+	exe := splittedCmd[0]
+
+	for i, arg := range splittedCmd {
+		if strings.Contains(arg, fmt.Sprintf(pattern, counter)) {
+			splittedCmd[i] = strings.ReplaceAll(arg, fmt.Sprintf(pattern, counter), quotedArgs[counter])
+			counter++
+		}
+	}
+	_, err := exec.LookPath(exe)
 	if err != nil {
-		fmt.Println("failed to find exec :", cmdWithArgs[0])
+		fmt.Println("failed to find exec :", exe)
 		return err
 	}
 
-	command := exec.CommandContext(r.ctx, cmdWithArgs[0], cmdWithArgs[1:]...)
+	command := exec.CommandContext(r.ctx, exe, splittedCmd[1:]...)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 	command.Dir = cwd
 
@@ -463,7 +476,8 @@ func (r Runner) getTemplate(tempEngine, tempPath string) (string, error) {
 		},
 	}
 	config := extism.PluginConfig{
-		EnableWasi: true,
+		ModuleConfig: wazero.NewModuleConfig().WithName(mod.Name),
+		EnableWasi:   true,
 	}
 	plugin, err := extism.NewPlugin(r.ctx, manifest, config, []extism.HostFunction{})
 	if err != nil {
@@ -489,7 +503,7 @@ func (r Runner) getTemplate(tempEngine, tempPath string) (string, error) {
 
 	data, _ := json.Marshal(input)
 
-	ex, out, err := plugin.CallWithContext(r.ctx, "render", data)
+	ex, out, err := plugin.CallWithContext(r.ctx, "applyTemplate", data)
 	if ex == 0 {
 		if err != nil {
 			panic(fmt.Sprintf("the filer plugin failed to retrieve data from the template engine %s: %s", mod.Name, err.Error()))
@@ -499,68 +513,6 @@ func (r Runner) getTemplate(tempEngine, tempPath string) (string, error) {
 		return "", fmt.Errorf("template plugin exited with error status: %s", errString)
 	}
 	return string(out), nil
-}
-
-func (r Runner) callTemplateFunc(ctx context.Context, p *extism.CurrentPlugin, stack []uint64) {
-	handleErr := func(msg []byte) {
-		var err error
-		stack[1], err = p.WriteBytes(msg)
-		if err != nil {
-			panic(fmt.Errorf("an error as occured while parsing template and the caller failed to handle it: %w", err))
-		}
-	}
-
-	tempPath, err := p.ReadString(stack[1])
-	if err != nil {
-		handleErr([]byte(err.Error()))
-	}
-	tempEngine, err := p.ReadString(stack[0])
-	if err != nil {
-		handleErr([]byte(err.Error()))
-	}
-
-	mod, err := r.modCase.RetrieveModule(ctx, tempEngine)
-	if err != nil {
-		handleErr([]byte(err.Error()))
-	}
-
-	if mod.Type != model.TempEngineType {
-		err = fmt.Errorf("")
-		handleErr([]byte(err.Error()))
-	}
-	manifest := extism.Manifest{
-		Wasm: []extism.Wasm{
-			extism.WasmFile{
-				Name: mod.Name,
-				Path: mod.Path,
-			},
-		},
-	}
-	config := extism.PluginConfig{}
-	plugin, err := extism.NewPlugin(r.ctx, manifest, config, []extism.HostFunction{})
-	if err != nil {
-		handleErr([]byte(err.Error()))
-	}
-
-	fileContent, err := os.ReadFile(tempPath)
-	if err != nil {
-		handleErr([]byte(err.Error()))
-	}
-
-	ex, out, err := plugin.CallWithContext(ctx, string(model.FormatTemplAction), fileContent)
-	if err != nil {
-		handleErr([]byte(err.Error()))
-	}
-
-	if ex == 0 {
-		stack[0], err = p.WriteBytes(out)
-		if err != nil {
-			panic(fmt.Sprintf("the filer plugin failed to retrieve data from the template engine %s: %s", mod.Name, err.Error()))
-		}
-	} else {
-		errString := plugin.GetErrorWithContext(r.ctx)
-		handleErr([]byte(fmt.Sprintf("template plugin exited with error status: %s", errString)))
-	}
 }
 
 func setLogger(plugin *extism.Plugin, step model.Step) {

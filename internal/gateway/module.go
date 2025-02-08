@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"errors"
 	"fmt"
 
 	"github.com/bootengine/boot/internal/model"
@@ -64,11 +65,12 @@ func (m *ModuleGateway) OpenDatabase(databaseUrl string) error {
 // TODO: better error handling
 func (m ModuleGateway) InitDatabase() error {
 	if m.DB == nil {
-		fmt.Println("wuuuut")
+		return errors.New("failed to connect to database")
 	}
+
 	_, err := m.DB.Exec(initSQL)
 	if err != nil {
-		fmt.Println("error in init")
+		return fmt.Errorf("failed to init database")
 	}
 
 	return err
