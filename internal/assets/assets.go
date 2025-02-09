@@ -7,3 +7,6 @@ import "embed"
 //
 //go:embed licenses/*
 var LicenseFS embed.FS
+
+//go:embed plugins/*
+var PluginFS embed.FS
