@@ -1,6 +1,7 @@
 #Config : {
 	create_root?: bool | true
 	unrestricted?: bool | false
+	from?: string
 }
 
 #Var : {

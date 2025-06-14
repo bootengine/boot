@@ -14,6 +14,7 @@ import (
 // Filer types are either File or Folder.
 type Filer interface {
 	IsFile() bool
+	GetName() string
 }
 
 type TemplateDef struct {
@@ -72,6 +73,10 @@ func (f File) IsFile() bool {
 	return true
 }
 
+func (f File) GetName() string {
+	return f.Name
+}
+
 // A Folder is one of the two types that can be defined in folder_struct.
 // It has a Name, and it can have children as an array of Filer.
 type Folder struct {
@@ -119,6 +124,10 @@ func (f *Folder) UnmarshalJSON(data []byte) error {
 // IsFile implements the Filer interface on Folder type.
 func (f Folder) IsFile() bool {
 	return false
+}
+
+func (f Folder) GetName() string {
+	return f.Name
 }
 
 // FolderStruct is a user-defined folder_struct. It's just an array of Filer.

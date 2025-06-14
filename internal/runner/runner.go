@@ -15,6 +15,7 @@ import (
 	"github.com/bootengine/boot/internal/helper"
 	"github.com/bootengine/boot/internal/license"
 	"github.com/bootengine/boot/internal/model"
+	"github.com/bootengine/boot/internal/parser"
 	"github.com/bootengine/boot/internal/usecase"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/log"
@@ -22,16 +23,40 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-type Runner struct {
-	ctx      context.Context
-	workflow model.Workflow
-	modCase  *usecase.ModuleUsecase
+var options = []huh.Option[string]{
+	huh.NewOption("MIT", "mit"),
+	huh.NewOption("GNU GPL v3", "gnugpl3"),
+	huh.NewOption("GNU AGPL v3", "gnuagpl3"),
+	huh.NewOption("GNU LGPL v3", "gnulgpl3"),
+	huh.NewOption("Mozilla Public License", "mozillapublic"),
+	huh.NewOption("Apache 2.0", "apache2"),
+	huh.NewOption("Boost Software License", "boostsoftware"),
+	huh.NewOption("Unlicense", "unlicense"),
 }
 
-type StepError struct {
-	err                error
-	moduleName, action string
-}
+type (
+	Runner struct {
+		ctx      context.Context
+		workflow model.Workflow
+		modCase  *usecase.ModuleUsecase
+	}
+	StepError struct {
+		err                error
+		moduleName, action string
+	}
+	NoKeepGoingError bool
+	VarError         struct {
+		err  error
+		vars string
+	}
+	RunnerError interface {
+		GetType() string
+		Error() string
+	}
+	HuhError struct {
+		Err error
+	}
+)
 
 func (s StepError) Error() string {
 	return fmt.Sprintf("failed to execute runner for module %s, action %s: %s", s.moduleName, s.action, s.err.Error())
@@ -41,11 +66,6 @@ func (s StepError) GetType() string {
 	return "steps"
 }
 
-type VarError struct {
-	err  error
-	vars string
-}
-
 func (v VarError) Error() string {
 	return fmt.Sprintf("failed to handle var %s: %s", v.vars, v.err)
 }
@@ -53,14 +73,10 @@ func (v VarError) GetType() string {
 	return "vars"
 }
 
-type RunnerError interface {
-	GetType() string
-	Error() string
-}
-
-var keepGoing bool = true
-
-type NoKeepGoingError bool
+var (
+	keepGoing            bool = true
+	ErrNoLicenseSelected      = fmt.Errorf("no license selected")
+)
 
 func (n NoKeepGoingError) Error() string {
 	return "no keep going"
@@ -72,10 +88,6 @@ func NewRunner(use *usecase.ModuleUsecase, workflow model.Workflow) *Runner {
 		modCase:  use,
 		workflow: workflow,
 	}
-}
-
-type HuhError struct {
-	Err error
 }
 
 func (h HuhError) Error() string {
@@ -102,7 +114,60 @@ func (r Runner) checkFolderStructCreation() error {
 	return nil
 }
 
+func parseFolder(fs model.FolderStruct, pathMap map[string]string, currentPath string) {
+	for _, fd := range fs {
+		if fd.IsFile() {
+			continue
+		}
+		if strings.HasPrefix(fd.GetName(), "$") {
+			pathMap[strings.TrimPrefix(fd.GetName(), "$")] = currentPath
+			continue
+		}
+
+		parseFolder(fd.(model.Folder).Filers, pathMap, filepath.Join(currentPath, fd.GetName()))
+	}
+
+}
+
 func (r Runner) Run() error {
+	if len(r.workflow.Config.Includes) > 0 {
+		aliases := make(map[string]model.FolderStruct, len(r.workflow.Config.Includes))
+
+		// calculate base path
+		includedFolder := make(map[string]string)
+		parseFolder(r.workflow.FolderStruct, includedFolder, "")
+
+		// TODO: nested loop are really bad for perf !
+		for _, include := range r.workflow.Config.Includes {
+			work, err := parser.NewParser().Parse(include.From)
+			if err != nil {
+				return err
+			}
+			// Hint: might be able to remove that using a Set (or something that manage uniqueness)
+			for _, v := range work.Vars {
+				if !slices.ContainsFunc(r.workflow.Vars, func(elem model.Var) bool {
+					return v.Name == elem.Name
+				}) {
+					r.workflow.Vars = append([]model.Var{v}, r.workflow.Vars...)
+				}
+			}
+
+			//TODO: included command should be run in specific context
+			// Hint: might be able to remove that using a Set (or something that manage uniqueness)
+			// only need to deduplicate the folder_struct command
+			for _, s := range work.Steps {
+				if s.Action != model.CreateFolderStructAction {
+					s.CurrentWorkingDir = includedFolder[include.As]
+					r.workflow.Steps = append(r.workflow.Steps, s)
+				}
+			}
+
+			aliases[include.As] = work.FolderStruct
+		}
+
+		r.workflow.FolderStruct = mergeFolderStruct(r.workflow.FolderStruct, aliases)
+	}
+
 	err := r.checkFolderStructCreation()
 	if err != nil {
 		return err
@@ -124,7 +189,26 @@ func (r Runner) Run() error {
 	return r.handleSteps()
 }
 
-var ErrNoLicenseSelected = fmt.Errorf("no license selected")
+func mergeFolderStruct(fs model.FolderStruct, content map[string]model.FolderStruct) model.FolderStruct {
+	for i, f := range fs {
+		if f.IsFile() {
+			continue
+		}
+		if !f.IsFile() && !strings.HasPrefix(f.GetName(), "$") {
+			current := f.(model.Folder)
+			current.Filers = mergeFolderStruct(f.(model.Folder).Filers, content)
+			fs[i] = current
+		}
+		if !f.IsFile() && strings.HasPrefix(f.GetName(), "$") {
+			name := strings.TrimPrefix(f.GetName(), "$")
+			if merging, ok := content[name]; ok {
+				fs = slices.Replace(fs, i, i+1, merging...)
+			}
+		}
+	}
+
+	return fs
+}
 
 func (r *Runner) createLicense() error {
 	contextValue := r.ctx.Value(helper.ValueKey{}).(map[string]any)
@@ -185,14 +269,7 @@ func (r *Runner) handleVars() error {
 				if the license you want is not in the list, please create an issue () or contribute ()
 				`).
 				Options(
-					huh.NewOption("MIT", "mit"),
-					huh.NewOption("GNU GPL v3", "gnugpl3"),
-					huh.NewOption("GNU AGPL v3", "gnuagpl3"),
-					huh.NewOption("GNU LGPL v3", "gnulgpl3"),
-					huh.NewOption("Mozilla Public License", "mozillapublic"),
-					huh.NewOption("Apache 2.0", "apache2"),
-					huh.NewOption("Boost Software License", "boostsoftware"),
-					huh.NewOption("Unlicense", "unlicense"),
+					options...,
 				).Value(&val).Run()
 			if err != nil {
 				return HuhError{Err: err}
@@ -288,6 +365,8 @@ func (r Runner) handleSteps() error {
 				}
 			}
 		}
+
+		log.Infof("About to run action %q of module %q in %q with params %v", step.Action, step.Module, step.CurrentWorkingDir, params)
 
 		exit, out, err := plugin.CallWithContext(r.ctx, string(step.Action), params)
 		if err != nil {
@@ -437,6 +516,7 @@ func (r Runner) executeCommand(cmd string, cwd string) error {
 	command.Dir = cwd
 
 	// TODO: Should print here or in the caller the command and the cwd
+	log.Infof("about to run command %q", cmd)
 
 	return command.Run()
 }
@@ -516,7 +596,7 @@ func (r Runner) getTemplate(tempEngine, tempPath string) (string, error) {
 }
 
 func setLogger(plugin *extism.Plugin, step model.Step) {
-	extism.SetLogLevel(extism.LogLevelTrace) // TODO: Change log level when prod-ready
+	extism.SetLogLevel(extism.LogLevelTrace) // TODO: Change log level when prod-ready(should be set dynamicly)
 
 	plugin.SetLogger(func(ll extism.LogLevel, s string) {
 		log.NewWithOptions(os.Stdout, log.Options{
