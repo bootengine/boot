@@ -52,6 +52,25 @@ changelog:
       - "^docs:"
       - "^test:"
 
+## Need to create man page and completion files before
+homebrew_casks:
+- name: boot
+  homepage: https://github.com/bootengine/
+  description: boot is a simple cli made to bootstrap any project with a plugin engine that allows you to enhance it using any programming language that can compile to wasm/wasi.
+  manpages:
+    - man/
+  completions:
+  zap:
+    delete:
+      - ~/.config/bootengine/
+  uninstall:
+    delete:
+      - ~/.config/bootengine/
+  repository:
+    owner: bootengine
+    name: homebrew-toools
+    branch: main
+
 release:
 
   footer: >-
