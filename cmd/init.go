@@ -54,7 +54,7 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(initCmd)
+	RootCmd.AddCommand(initCmd)
 
 	initCmd.Flags().StringVarP(&initFlags.outputFilename, "output", "o", "", "filename of the output.")
 	initCmd.Flags().StringVarP((*string)(&initFlags.outputType), "type", "t", "yaml", "type of the output file.")

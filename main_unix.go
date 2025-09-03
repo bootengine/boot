@@ -1,3 +1,5 @@
+//go:build linux || darwin
+
 /*
 Copyright © 2024 BootEngine <mathob.jehanno@hotmail.fr>
 */
@@ -10,10 +12,12 @@ import (
 	"path/filepath"
 
 	"github.com/bootengine/boot/cmd"
+
 	"github.com/bootengine/boot/internal/assets"
 	"github.com/bootengine/boot/internal/gateway"
 	"github.com/bootengine/boot/internal/model"
 	"github.com/charmbracelet/log"
+	"github.com/spf13/cobra/doc"
 )
 
 func create_config_folder() (string, error) {
@@ -88,6 +92,7 @@ func bootstrap() error {
 	defer func() {
 		err = mg.CloseDatabase()
 		if err != nil {
+			log.Fatalf("failed to close database: %s", err.Error())
 		}
 	}()
 
@@ -105,10 +110,41 @@ func bootstrap() error {
 	return err
 }
 
+// might want to have that only in linux compiled binary
+// either using suffixed-file or go build tag
+func generateMan() error {
+	header := &doc.GenManHeader{
+		Title:   "Boot",
+		Section: "1",
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	// manDir := filepath.Join(homeDir, ".local", "bin", "boot", "man")
+	manDir := filepath.Join(homeDir, ".local", "share", "man", "man1")
+
+	err = os.MkdirAll(manDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	// instead of /tmp use CONFIG_DIR/man it should be handled auto by man
+	return doc.GenManTree(cmd.RootCmd, header, manDir)
+}
+
 func init() {
+
 	err := bootstrap()
 	if err != nil {
 		log.Fatalf("failed to run init phase of boot application: %s", err.Error())
+	}
+
+	err = generateMan()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 

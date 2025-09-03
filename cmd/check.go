@@ -39,7 +39,7 @@ var checkCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(checkCmd)
+	RootCmd.AddCommand(checkCmd)
 
 	checkCmd.Flags().StringVarP(&checkFlags.filename, "filename", "f", "", `the path to the config file you want to check.`)
 	checkCmd.MarkFlagFilename("filename", []string{string(helper.JSON), string(helper.YAML), string(helper.YML)}...)

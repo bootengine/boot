@@ -3,12 +3,14 @@ module github.com/bootengine/boot
 go 1.23.5
 
 require (
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
 

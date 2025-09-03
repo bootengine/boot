@@ -66,7 +66,7 @@ func cleanup() error {
 }
 
 func init() {
-	rootCmd.AddCommand(genCmd)
+	RootCmd.AddCommand(genCmd)
 
 	genCmd.Flags().StringVarP(&genFlags.pathOrURL, "file", "f", "", `config file for the generation process, can be either a repo url or a local path.
 If it's a repo url, the repo will be downloaded in a tmp dir and removed afterward.

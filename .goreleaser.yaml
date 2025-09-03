@@ -1,19 +1,8 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
-
-# The lines below are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/need to use them.
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=cnqoj
-
 version: 2
 
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-    # you may remove this if you don't need go generate
-    - go generate ./...
 
 builds:
   - env:
@@ -24,7 +13,7 @@ builds:
       - darwin
 
 archives:
-  - format: tar.gz
+  - formats: ["tar.gz", "zip"]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       {{ .ProjectName }}_
@@ -36,8 +25,26 @@ archives:
     # use zip for windows archives
     format_overrides:
       - goos: windows
-        format: zip
-
+        formats: ["zip"]
+nfpms:
+  - id: boot
+    package_name: boot
+    vendor: bootengine
+    homepage: https://bootengine.github.io/
+    maintainer: bootengine
+    description: |
+      boot is a higthly customizable project bootstrapper.  It comes with a plugin system that accepts .wasm files meaning that you can create plugins in anything that compile to wasm.
+    formats:
+      - apk
+      - deb
+      - rpm
+      - termux.deb
+      - archlinux
+    file_name_template: >-
+      {{- trimsuffix .ConventionalFileName .ConventionalExtension -}}
+      {{- if and (eq .Arm "6") (eq .ConventionalExtension ".deb") }}6{{ end -}}
+      {{- if not (eq .Amd64 "v1")}}{{ .Amd64 }}{{ end -}}
+      {{- .ConventionalExtension -}}
 changelog:
   sort: asc
   filters:
@@ -46,6 +53,7 @@ changelog:
       - "^test:"
 
 release:
+
   footer: >-
 
     ---
