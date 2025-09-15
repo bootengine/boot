@@ -4,8 +4,7 @@ on:
   push:
     tags:
       - "*"
-permissions:
-  packages: read
+permissions: write-all
 jobs:
   Build:
     runs-on: ubuntu-latest
